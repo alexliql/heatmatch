@@ -32,6 +32,10 @@ packages = ["src/ingest"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Import the package from the source tree directly rather than relying on the
+# editable install's .pth shim, which has twice dropped out of the local venv
+# and broken collection with ModuleNotFoundError.
+pythonpath = ["src"]
 
 [tool.ruff]
 line-length = 100

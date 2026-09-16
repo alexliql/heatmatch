@@ -1,0 +1,81 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -74.006,
+     40.7128
+    ]
+   },
+   "properties": {
+    "id": "dc_a",
+    "name": "Alpha",
+    "region": "nyc",
+    "mw": 1.0,
+    "cooling": "unknown",
+    "in_steam": false,
+    "in_uten": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -73.946677105,
+     40.7128
+    ]
+   },
+   "properties": {
+    "id": "dc_b",
+    "name": "Bravo",
+    "region": "nyc",
+    "mw": 2.0,
+    "cooling": "unknown",
+    "in_steam": false,
+    "in_uten": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -73.88735421,
+     40.7128
+    ]
+   },
+   "properties": {
+    "id": "dc_c",
+    "name": "Charlie",
+    "region": "nyc",
+    "mw": 0.5,
+    "cooling": "unknown",
+    "in_steam": false,
+    "in_uten": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -73.828031315,
+     40.7128
+    ]
+   },
+   "properties": {
+    "id": "dc_d",
+    "name": "Delta",
+    "region": "nyc",
+    "mw": 1.0,
+    "cooling": "unknown",
+    "in_steam": false,
+    "in_uten": false
+   }
+  }
+ ]
+}

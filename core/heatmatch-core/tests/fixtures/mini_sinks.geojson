@@ -1,0 +1,575 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -74.003627084,
+     40.7128
+    ]
+   },
+   "properties": {
+    "id": "s_000",
+    "name": "pool-0",
+    "region": "nyc",
+    "cat": "pool",
+    "demand_kwh": 1000000.0,
+    "in_steam": false,
+    "in_uten": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -74.001254168,
+     40.7128
+    ]
+   },
+   "properties": {
+    "id": "s_001",
+    "name": "hospital-1",
+    "region": "nyc",
+    "cat": "hospital",
+    "demand_kwh": 2000000.0,
+    "in_steam": false,
+    "in_uten": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -73.998881253,
+     40.7128
+    ]
+   },
+   "properties": {
+    "id": "s_002",
+    "name": "office-2",
+    "region": "nyc",
+    "cat": "office",
+    "demand_kwh": 5000000.0,
+    "in_steam": false,
+    "in_uten": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -73.996508337,
+     40.7128
+    ]
+   },
+   "properties": {
+    "id": "s_003",
+    "name": "school-3",
+    "region": "nyc",
+    "cat": "school",
+    "demand_kwh": 500000.0,
+    "in_steam": false,
+    "in_uten": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -73.995321879,
+     40.7128
+    ]
+   },
+   "properties": {
+    "id": "s_004",
+    "name": "greenhouse-4",
+    "region": "nyc",
+    "cat": "greenhouse",
+    "demand_kwh": 1000000.0,
+    "in_steam": false,
+    "in_uten": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -73.99472865,
+     40.7128
+    ]
+   },
+   "properties": {
+    "id": "s_005",
+    "name": "hotel-5",
+    "region": "nyc",
+    "cat": "hotel",
+    "demand_kwh": 1000000.0,
+    "in_steam": false,
+    "in_uten": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -73.991762505,
+     40.7128
+    ]
+   },
+   "properties": {
+    "id": "s_006",
+    "name": "brewery-6",
+    "region": "nyc",
+    "cat": "brewery",
+    "demand_kwh": 800000.0,
+    "in_steam": false,
+    "in_uten": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -73.945490647,
+     40.7128
+    ]
+   },
+   "properties": {
+    "id": "s_007",
+    "name": "pool-7",
+    "region": "nyc",
+    "cat": "pool",
+    "demand_kwh": 40000000.0,
+    "in_steam": false,
+    "in_uten": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -73.944304189,
+     40.7128
+    ]
+   },
+   "properties": {
+    "id": "s_008",
+    "name": "pool-8",
+    "region": "nyc",
+    "cat": "pool",
+    "demand_kwh": 40000000.0,
+    "in_steam": false,
+    "in_uten": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -73.943117731,
+     40.7128
+    ]
+   },
+   "properties": {
+    "id": "s_009",
+    "name": "wwtp-9",
+    "region": "nyc",
+    "cat": "wwtp",
+    "demand_kwh": 40000000.0,
+    "in_steam": false,
+    "in_uten": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -73.941931273,
+     40.7128
+    ]
+   },
+   "properties": {
+    "id": "s_010",
+    "name": "hospital-10",
+    "region": "nyc",
+    "cat": "hospital",
+    "demand_kwh": 40000000.0,
+    "in_steam": false,
+    "in_uten": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -73.940744816,
+     40.7128
+    ]
+   },
+   "properties": {
+    "id": "s_011",
+    "name": "university-11",
+    "region": "nyc",
+    "cat": "university",
+    "demand_kwh": 40000000.0,
+    "in_steam": false,
+    "in_uten": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -73.939558358,
+     40.7128
+    ]
+   },
+   "properties": {
+    "id": "s_012",
+    "name": "hotel-12",
+    "region": "nyc",
+    "cat": "hotel",
+    "demand_kwh": 40000000.0,
+    "in_steam": false,
+    "in_uten": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -73.885574523,
+     40.7128
+    ]
+   },
+   "properties": {
+    "id": "s_013",
+    "name": "pool-13",
+    "region": "nyc",
+    "cat": "pool",
+    "demand_kwh": 300000.0,
+    "in_steam": false,
+    "in_uten": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -73.883201607,
+     40.7128
+    ]
+   },
+   "properties": {
+    "id": "s_014",
+    "name": "residential_multifamily-14",
+    "region": "nyc",
+    "cat": "residential_multifamily",
+    "demand_kwh": 700000.0,
+    "in_steam": false,
+    "in_uten": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -73.880828692,
+     40.7128
+    ]
+   },
+   "properties": {
+    "id": "s_015",
+    "name": "wwtp-15",
+    "region": "nyc",
+    "cat": "wwtp",
+    "demand_kwh": 1500000.0,
+    "in_steam": false,
+    "in_uten": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -74.006,
+     40.739779648
+    ]
+   },
+   "properties": {
+    "id": "s_016",
+    "name": "office-16",
+    "region": "nyc",
+    "cat": "office",
+    "demand_kwh": 1000000.0,
+    "in_steam": false,
+    "in_uten": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -74.006,
+     40.74067897
+    ]
+   },
+   "properties": {
+    "id": "s_017",
+    "name": "office-17",
+    "region": "nyc",
+    "cat": "office",
+    "demand_kwh": 1000000.0,
+    "in_steam": false,
+    "in_uten": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -74.006,
+     40.741578291
+    ]
+   },
+   "properties": {
+    "id": "s_018",
+    "name": "office-18",
+    "region": "nyc",
+    "cat": "office",
+    "demand_kwh": 1000000.0,
+    "in_steam": false,
+    "in_uten": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -74.006,
+     40.742477613
+    ]
+   },
+   "properties": {
+    "id": "s_019",
+    "name": "office-19",
+    "region": "nyc",
+    "cat": "office",
+    "demand_kwh": 1000000.0,
+    "in_steam": false,
+    "in_uten": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -74.006,
+     40.743376935
+    ]
+   },
+   "properties": {
+    "id": "s_020",
+    "name": "office-20",
+    "region": "nyc",
+    "cat": "office",
+    "demand_kwh": 1000000.0,
+    "in_steam": false,
+    "in_uten": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -74.006,
+     40.744276256
+    ]
+   },
+   "properties": {
+    "id": "s_021",
+    "name": "office-21",
+    "region": "nyc",
+    "cat": "office",
+    "demand_kwh": 1000000.0,
+    "in_steam": false,
+    "in_uten": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -74.006,
+     40.745175578
+    ]
+   },
+   "properties": {
+    "id": "s_022",
+    "name": "office-22",
+    "region": "nyc",
+    "cat": "office",
+    "demand_kwh": 1000000.0,
+    "in_steam": false,
+    "in_uten": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -74.006,
+     40.746074899
+    ]
+   },
+   "properties": {
+    "id": "s_023",
+    "name": "office-23",
+    "region": "nyc",
+    "cat": "office",
+    "demand_kwh": 1000000.0,
+    "in_steam": false,
+    "in_uten": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -74.006,
+     40.746974221
+    ]
+   },
+   "properties": {
+    "id": "s_024",
+    "name": "office-24",
+    "region": "nyc",
+    "cat": "office",
+    "demand_kwh": 1000000.0,
+    "in_steam": false,
+    "in_uten": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -74.006,
+     40.747873543
+    ]
+   },
+   "properties": {
+    "id": "s_025",
+    "name": "office-25",
+    "region": "nyc",
+    "cat": "office",
+    "demand_kwh": 1000000.0,
+    "in_steam": false,
+    "in_uten": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -74.006,
+     40.748772864
+    ]
+   },
+   "properties": {
+    "id": "s_026",
+    "name": "office-26",
+    "region": "nyc",
+    "cat": "office",
+    "demand_kwh": 1000000.0,
+    "in_steam": false,
+    "in_uten": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -74.006,
+     40.749672186
+    ]
+   },
+   "properties": {
+    "id": "s_027",
+    "name": "office-27",
+    "region": "nyc",
+    "cat": "office",
+    "demand_kwh": 1000000.0,
+    "in_steam": false,
+    "in_uten": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -74.006,
+     40.750571507
+    ]
+   },
+   "properties": {
+    "id": "s_028",
+    "name": "office-28",
+    "region": "nyc",
+    "cat": "office",
+    "demand_kwh": 1000000.0,
+    "in_steam": false,
+    "in_uten": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -74.006,
+     40.751470829
+    ]
+   },
+   "properties": {
+    "id": "s_029",
+    "name": "office-29",
+    "region": "nyc",
+    "cat": "office",
+    "demand_kwh": 1000000.0,
+    "in_steam": false,
+    "in_uten": false
+   }
+  }
+ ]
+}
