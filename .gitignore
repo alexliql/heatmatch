@@ -3,6 +3,7 @@ ingest/raw/
 
 # wasm-pack output — built by CI and by `make wasm`, never committed (spec §5)
 web/src/wasm/
+core/heatmatch-wasm/pkg-node/
 
 # Python
 .venv/

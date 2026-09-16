@@ -18,3 +18,10 @@ geojson.workspace = true
 wasm-bindgen = "0.2"
 serde-wasm-bindgen = "0.6"
 console_error_panic_hook = "0.1"
+
+# wasm-opt downloads a binaryen release on first use, which makes every build
+# depend on a GitHub download and has already broken CI once. The release
+# profile already runs LTO at opt-level 3; the extra shrink is not worth an
+# unreliable build.
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = false

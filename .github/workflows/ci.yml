@@ -58,7 +58,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+      # The bundler target is what the web app consumes.
       - run: wasm-pack build core/heatmatch-wasm --target bundler --release --out-dir ../../web/src/wasm
+      # The smoke test needs the nodejs target: the bundler output imports the
+      # .wasm file directly, which Node cannot resolve on its own.
+      - run: wasm-pack build core/heatmatch-wasm --target nodejs --release --out-dir pkg-node
       # Exercises GeoJSON parsing, serde-wasm-bindgen conversion and the
       # generated types together — the only test that crosses the real boundary.
       - run: node core/heatmatch-wasm/tests/smoke.mjs

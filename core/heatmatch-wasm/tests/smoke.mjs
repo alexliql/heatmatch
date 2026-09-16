@@ -15,9 +15,12 @@ import { fileURLToPath } from "node:url";
 const here = dirname(fileURLToPath(import.meta.url));
 const fixtures = join(here, "../../heatmatch-core/tests/fixtures");
 
-// The bundler target emits ESM with a wasm import, which Node resolves through
-// the nodejs-flavoured build; wasm-pack writes both into the same package.
-const { WasmEngine } = await import(join(here, "../../../web/src/wasm/heatmatch_wasm.js"));
+// Loaded from a nodejs-target build, not the bundler one the web app uses:
+// the bundler output imports the .wasm file directly, which only a bundler (or
+// a very new Node with experimental flags) can resolve. Build it with
+// `make wasm-node`, or run the whole thing via `make wasm-test`.
+const pkg = join(here, "../pkg-node/heatmatch_wasm.js");
+const { WasmEngine } = await import(pkg);
 
 const dcs = readFileSync(join(fixtures, "mini_dcs.geojson"), "utf8");
 const sinks = readFileSync(join(fixtures, "mini_sinks.geojson"), "utf8");

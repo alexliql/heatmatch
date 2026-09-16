@@ -17,7 +17,10 @@ core-test:  ## cargo fmt check + clippy + tests for the Rust workspace
 wasm:  ## Build the wasm package into web/src/wasm (not committed)
 	wasm-pack build core/heatmatch-wasm --target bundler --release --out-dir ../../web/src/wasm
 
-wasm-test: wasm  ## Build the wasm package and run the node smoke test
+wasm-node:  ## Build a nodejs-target package for the smoke test
+	wasm-pack build core/heatmatch-wasm --target nodejs --release --out-dir pkg-node
+
+wasm-test: wasm-node  ## Build the node package and run the smoke test
 	node core/heatmatch-wasm/tests/smoke.mjs
 
 web-dev: wasm  ## Next.js dev server
@@ -37,4 +40,4 @@ fmt:  ## Format Rust and TS in place
 	cd web && pnpm format
 
 clean:
-	rm -rf core/target web/.next web/out web/src/wasm web/public/data
+	rm -rf core/target web/.next web/out web/src/wasm web/public/data core/heatmatch-wasm/pkg-node
