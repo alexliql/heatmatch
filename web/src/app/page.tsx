@@ -1,15 +1,20 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
+import { DcDetail } from "@/components/DcDetail";
 import { Footer } from "@/components/Footer";
 import { Map } from "@/components/Map";
 import { RegionToggle } from "@/components/RegionToggle";
 import { ResultsTable } from "@/components/ResultsTable";
+import { WeightsPanel } from "@/components/WeightsPanel";
 import { BUCKET_COLORS, BUCKET_LABELS } from "@/lib/format";
 import { useStore } from "@/lib/store";
 
+type Tab = "results" | "tuning" | "detail";
+
 export default function Page() {
+  const [tab, setTab] = useState<Tab>("results");
   const init = useStore((s) => s.init);
   const engine = useStore((s) => s.engine);
   const progress = useStore((s) => s.progress);
@@ -20,6 +25,14 @@ export default function Page() {
   useEffect(() => {
     void init();
   }, [init]);
+
+  // Selecting a site should show its detail rather than leaving the reader to
+  // find the tab themselves.
+  const selectedDc = useStore((s) => s.selectedDc);
+  useEffect(() => {
+    if (selectedDc) setTab("detail");
+  }, [selectedDc]);
+
 
   if (error) {
     return (
@@ -65,21 +78,35 @@ export default function Page() {
       <div className="layout">
         <Map />
         <aside className="side">
-          <section className="section">
-            <h2>Payback</h2>
-            <div className="legend">
-              {(["fast", "medium", "slow", "none"] as const).map((b) => (
-                <span key={b}>
-                  <span className="dot" style={{ background: BUCKET_COLORS[b] }} />
-                  {BUCKET_LABELS[b]}
-                </span>
-              ))}
-            </div>
-          </section>
-          <section className="section">
-            <h2>Ranked data centers</h2>
-            <ResultsTable />
-          </section>
+          <div className="tabs">
+            {(["results", "tuning", "detail"] as const).map((t) => (
+              <button key={t} data-active={tab === t} onClick={() => setTab(t)}>
+                {t === "results" ? "Ranking" : t === "tuning" ? "Assumptions" : "Detail"}
+              </button>
+            ))}
+          </div>
+
+          {tab === "results" && (
+            <>
+              <section className="section">
+                <h2>Payback</h2>
+                <div className="legend">
+                  {(["fast", "medium", "slow", "none"] as const).map((b) => (
+                    <span key={b}>
+                      <span className="dot" style={{ background: BUCKET_COLORS[b] }} />
+                      {BUCKET_LABELS[b]}
+                    </span>
+                  ))}
+                </div>
+              </section>
+              <section className="section">
+                <h2>Ranked data centers</h2>
+                <ResultsTable />
+              </section>
+            </>
+          )}
+          {tab === "tuning" && <WeightsPanel />}
+          {tab === "detail" && <DcDetail />}
         </aside>
       </div>
 

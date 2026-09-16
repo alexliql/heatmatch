@@ -165,3 +165,72 @@ button:hover { border-color: var(--accent); }
   font-size: 11px;
   color: var(--muted);
 }
+
+.slider, .row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 5px;
+  font-size: 12px;
+}
+.slider > span:first-child, .row > span:first-child { flex: 0 0 130px; color: var(--muted); }
+.slider input[type="range"] { flex: 1; min-width: 0; }
+.slider > span:last-child { flex: 0 0 38px; text-align: right; }
+.row select, .row input[type="number"] {
+  flex: 1;
+  min-width: 0;
+  padding: 3px 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+}
+.row { flex-wrap: wrap; }
+
+textarea {
+  width: 100%;
+  margin-top: 8px;
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.facts { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 10px; margin: 0 0 12px; }
+.facts > div { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; }
+.facts dt { color: var(--muted); margin: 0; }
+.facts dd { margin: 0; }
+
+.season { margin: 10px 0; }
+.season-bars { display: flex; align-items: flex-end; gap: 3px; height: 70px; }
+.season-col { position: relative; flex: 1; height: 100%; }
+.season-bar {
+  position: absolute;
+  bottom: 12px;
+  width: 100%;
+  background: var(--accent);
+  opacity: 0.75;
+  border-radius: 2px 2px 0 0;
+}
+.season-supply {
+  position: absolute;
+  left: 0; right: 0;
+  height: 2px;
+  background: var(--text);
+  opacity: 0.55;
+  margin-bottom: 12px;
+}
+.season-label {
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  text-align: center;
+  font-size: 9px;
+  color: var(--muted);
+}
+
+.tabs { display: flex; gap: 6px; padding: 8px 14px 0; }
+.tabs button[data-active="true"] { border-color: var(--accent); color: var(--accent); }
