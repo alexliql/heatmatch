@@ -1,0 +1,21 @@
+[package]
+name = "heatmatch-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Waste-heat matching engine: scoring, thermodynamics, economics. No I/O."
+
+[dependencies]
+serde.workspace = true
+geo.workspace = true
+rstar.workspace = true
+enum-map.workspace = true
+smallvec.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
+geojson.workspace = true
+approx = "0.5"
+proptest = "1"
