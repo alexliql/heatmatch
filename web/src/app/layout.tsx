@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
 
+import "@/styles/globals.css";
+
 export const metadata: Metadata = {
-  title: "heatmatch",
-  description: "Ranking New York State data centers by waste-heat reuse potential.",
+  title: "heatmatch — waste heat reuse in New York State",
+  description:
+    "Ranks New York State data centers by how well their waste heat could be reused by nearby heat consumers.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
