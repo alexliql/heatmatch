@@ -130,12 +130,12 @@ impl Weights {
                 Region::Nyc => 1000.0,
                 Region::Upstate => 4000.0,
             },
-            // Detour factors match ingest's per-region `detour` values, so the
-            // sink pre-filter and the engine agree on what "in radius" means.
-            // NYC moves to RotatedL1 { theta_deg: 29.0 } once that model is
-            // implemented; defaulting to it now would select unreachable code.
+            // Manhattan's street grid runs ~29° off true north, so pipes
+            // there follow two axes rather than the diagonal. Upstate has no
+            // single orientation to exploit and gets a plain detour factor,
+            // matching ingest's per-region `detour` value.
             distance: match region {
-                Region::Nyc => DistanceModel::Detour { k: 1.30 },
+                Region::Nyc => DistanceModel::RotatedL1 { theta_deg: 29.0 },
                 Region::Upstate => DistanceModel::Detour { k: 1.20 },
             },
             decay: Decay::Linear,

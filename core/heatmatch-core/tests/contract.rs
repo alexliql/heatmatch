@@ -11,7 +11,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-use heatmatch_core::{DataCenter, Engine, Region, Sink, Weights};
+use heatmatch_core::{DataCenter, Econ, Engine, Region, Sink, Weights};
 use serde_json::{Map, Value};
 
 fn data_dir() -> PathBuf {
@@ -115,9 +115,13 @@ fn engine_ranks_the_committed_dataset() {
         .collect();
 
     let expected = dcs.len();
-    let engine = Engine::new(dcs, sinks).expect("engine build");
+    let engine = Engine::new(dcs, sinks, &[]).expect("engine build");
     let ranked = engine
-        .rank(Region::Nyc, &Weights::default_for(Region::Nyc))
+        .rank(
+            Region::Nyc,
+            &Weights::default_for(Region::Nyc),
+            &Econ::default_for(Region::Nyc),
+        )
         .unwrap();
 
     assert_eq!(ranked.len(), expected);

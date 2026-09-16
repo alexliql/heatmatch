@@ -8,7 +8,7 @@ mod support;
 use heatmatch_core::{
     distance::{euclid, pipe_length, search_radius},
     frame::LocalFrame,
-    DataCenter, Decay, DistanceModel, Engine, Region, Sink, SinkCat, Weights,
+    DataCenter, Decay, DistanceModel, Econ, Engine, Region, Sink, SinkCat, Weights,
 };
 use proptest::prelude::*;
 
@@ -19,6 +19,11 @@ fn base_weights() -> Weights {
         radius_m: 1000.0,
         ..Weights::default_for(Region::Nyc)
     }
+}
+
+/// Region defaults; the economics model is exercised in `econ_*` tests.
+fn econ() -> Econ {
+    Econ::default_for(Region::Nyc)
 }
 
 fn cat_of(i: usize) -> SinkCat {
@@ -47,7 +52,7 @@ proptest! {
     ) {
         let w = Weights { radius_m: radius, per_sink_cap, utilization_hours: hours, ..base_weights() };
         let engine = support::mini_engine();
-        for m in engine.rank(Region::Nyc, &w).unwrap() {
+        for m in engine.rank(Region::Nyc, &w, &econ()).unwrap() {
             prop_assert!((0.0..=1.0).contains(&m.utilization), "utilization {} out of range", m.utilization);
             prop_assert!(m.delivered_mwh <= m.supply_mwh * 1.0001, "delivered exceeded supply");
             prop_assert!(m.score >= 0.0);
@@ -60,7 +65,7 @@ proptest! {
     fn rank_score_equals_sum_of_explain_scores(radius in 200.0f32..5000.0) {
         let w = Weights { radius_m: radius, ..base_weights() };
         let engine = support::mini_engine();
-        for m in engine.rank(Region::Nyc, &w).unwrap() {
+        for m in engine.rank(Region::Nyc, &w, &econ()).unwrap() {
             let summed: f32 = engine.explain(&m.dc, &w).unwrap().iter().map(|c| c.score).sum();
             prop_assert!((summed - m.score).abs() <= 1e-3 * m.score.max(1.0),
                 "explain sum {summed} != rank score {}", m.score);
@@ -71,11 +76,11 @@ proptest! {
     #[test]
     fn raising_a_category_weight_never_lowers_a_score(idx in 0usize..10, bump in 0.01f32..5.0) {
         let engine = support::mini_engine();
-        let before = engine.rank(Region::Nyc, &base_weights()).unwrap();
+        let before = engine.rank(Region::Nyc, &base_weights(), &econ()).unwrap();
 
         let mut w = base_weights();
         w.cat[cat_of(idx)] += bump;
-        let after = engine.rank(Region::Nyc, &w).unwrap();
+        let after = engine.rank(Region::Nyc, &w, &econ()).unwrap();
 
         for b in &before {
             let a = after.iter().find(|m| m.dc == b.dc).unwrap();
@@ -103,9 +108,9 @@ proptest! {
         far.lat = 40.7128 + frame_deg(100.0 + extra_m);
 
         let w = base_weights();
-        let near_score = Engine::new(vec![dc.clone()], vec![near]).unwrap()
+        let near_score = Engine::new(vec![dc.clone()], vec![near], &[]).unwrap()
             .explain("dc_0", &w).unwrap().first().map(|c| c.score).unwrap_or(0.0);
-        let far_score = Engine::new(vec![dc], vec![far]).unwrap()
+        let far_score = Engine::new(vec![dc], vec![far], &[]).unwrap()
             .explain("dc_0", &w).unwrap().first().map(|c| c.score).unwrap_or(0.0);
 
         prop_assert!(far_score <= near_score + 1e-4, "{far_score} > {near_score}");
@@ -118,10 +123,16 @@ proptest! {
     fn search_radius_never_misses_an_in_radius_sink(
         radius in 100.0f32..5000.0,
         k in 0.2f32..3.0,
+        theta in -180.0f32..180.0,
         dx in -8000.0f32..8000.0,
         dy in -8000.0f32..8000.0,
     ) {
-        for model in [DistanceModel::Euclid, DistanceModel::Detour { k }] {
+        let models = [
+            DistanceModel::Euclid,
+            DistanceModel::Detour { k },
+            DistanceModel::RotatedL1 { theta_deg: theta },
+        ];
+        for model in models {
             let pipe = pipe_length([0.0, 0.0], [dx, dy], &model);
             if pipe <= radius {
                 let straight = euclid([0.0, 0.0], [dx, dy]);

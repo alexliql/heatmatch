@@ -106,10 +106,6 @@ impl Sink {
 }
 
 /// One data center → sink pairing, as reported by `explain`.
-///
-/// `crosses_water`, `hp_required` and `cop` arrive with the water and
-/// thermodynamics models; they are omitted rather than stubbed so no caller
-/// can read a value this phase does not actually compute.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct Contribution {
@@ -117,8 +113,14 @@ pub struct Contribution {
     pub cat: SinkCat,
     /// Straight-line distance.
     pub dist_m: f32,
-    /// Distance the pipe actually runs, per the distance model.
+    /// Distance the pipe actually runs, per the distance model, including any
+    /// water-crossing penalty.
     pub pipe_m: f32,
+    pub crosses_water: bool,
+    pub hp_required: bool,
+    /// Units of heat per unit of electricity; infinite when no heat pump is
+    /// needed.
+    pub cop: f32,
     /// Heat this sink is allocated, after the supply budget is shared out.
     pub delivered_mwh: f32,
     /// Zero when the sink is in radius but received no allocation, so that
@@ -127,10 +129,6 @@ pub struct Contribution {
 }
 
 /// A ranked data center.
-///
-/// `capex`, `annual_savings` and `payback_yrs` arrive with the economics
-/// model. `utilization` and `delivered_mwh` are annual here; seasonality
-/// refines them to a monthly supply/demand overlap later.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct Match {
@@ -139,7 +137,13 @@ pub struct Match {
     pub score: f32,
     pub supply_mwh: f32,
     pub demand_mwh_in_radius: f32,
+    /// Share of the year's waste heat that finds a home, after seasonality.
     pub utilization: f32,
     pub delivered_mwh: f32,
+    pub capex: f32,
+    pub annual_savings: f32,
+    /// `None` when annual savings are not positive, so payback never reports
+    /// a negative or infinite number of years.
+    pub payback_yrs: Option<f32>,
     pub top: SmallVec<[Contribution; 5]>,
 }

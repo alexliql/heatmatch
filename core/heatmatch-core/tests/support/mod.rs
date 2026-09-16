@@ -1,4 +1,8 @@
 //! Shared fixture loading for the integration tests.
+//!
+//! Each test binary compiles this module separately, so any helper a given
+//! binary does not call looks dead to the lint.
+#![allow(dead_code)]
 
 use std::fs;
 use std::path::PathBuf;
@@ -44,5 +48,10 @@ pub fn mini_sinks() -> Vec<Sink> {
 }
 
 pub fn mini_engine() -> Engine {
-    Engine::new(mini_dcs(), mini_sinks()).expect("fixture engine")
+    Engine::new(mini_dcs(), mini_sinks(), &[]).expect("fixture engine")
+}
+
+/// Engine built with water polygons, for the crossing tests.
+pub fn mini_engine_with_water(water: &[geo::Polygon<f64>]) -> Engine {
+    Engine::new(mini_dcs(), mini_sinks(), water).expect("fixture engine")
 }

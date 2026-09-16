@@ -6,7 +6,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::time::Instant;
 
-use heatmatch_core::{DataCenter, Engine, Region, Sink, Weights};
+use heatmatch_core::{DataCenter, Econ, Engine, Region, Sink, Weights};
 use serde_json::{Map, Value};
 
 fn flatten(feature: &Value) -> Map<String, Value> {
@@ -41,19 +41,20 @@ fn main() {
     println!("dataset: {} data centers, {} sinks", dcs.len(), sinks.len());
 
     let build = Instant::now();
-    let engine = Engine::new(dcs, sinks).unwrap();
+    let engine = Engine::new(dcs, sinks, &[]).unwrap();
     println!(
         "Engine::new  {:>8.3} ms",
         build.elapsed().as_secs_f64() * 1e3
     );
 
     let w = Weights::default_for(Region::Nyc);
-    engine.rank(Region::Nyc, &w).unwrap(); // warm up
+    let e = Econ::default_for(Region::Nyc);
+    engine.rank(Region::Nyc, &w, &e).unwrap(); // warm up
 
     let runs = 1000;
     let t = Instant::now();
     for _ in 0..runs {
-        std::hint::black_box(engine.rank(Region::Nyc, &w).unwrap());
+        std::hint::black_box(engine.rank(Region::Nyc, &w, &e).unwrap());
     }
     let per = t.elapsed().as_secs_f64() * 1e3 / runs as f64;
     println!(

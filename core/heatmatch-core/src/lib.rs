@@ -5,21 +5,25 @@
 //! I/O, no globals, no randomness — the same inputs always produce the same
 //! ranking (ties broken by id ascending).
 //!
-//! The model is built in layers. Present: projection, spatial indexing,
-//! distance models and supply-constrained scoring. Still to come:
-//! thermodynamics (heat-pump lift and COP), seasonality, economics and
-//! water-crossing detection. Types carry only the fields the current model
-//! actually computes.
+//! The model runs in layers: project to metres, index the sinks, pick the ones
+//! a pipe could reach, judge each pairing on category, demand, distance and the
+//! heat-pump lift it needs, share the data center's finite supply across them,
+//! then overlay seasonality and cost it out.
 #![forbid(unsafe_code)]
 
 pub mod distance;
+pub mod econ;
 pub mod frame;
 pub mod index;
 pub mod scoring;
+pub mod season;
+pub mod thermo;
 pub mod types;
+pub mod water;
 pub mod weights;
 
 pub use scoring::{Engine, EngineError};
+pub use thermo::{heat_pump, required_temp_c, supply_temp_c, HeatPump};
 pub use types::{Contribution, Cooling, DataCenter, Id, Match, Region, Sink, SinkCat};
 pub use weights::{Decay, DistanceModel, Econ, WaterPolicy, Weights, WeightsError};
 

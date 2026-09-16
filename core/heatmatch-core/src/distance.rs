@@ -13,9 +13,13 @@ pub fn pipe_length(a: [f32; 2], b: [f32; 2], model: &DistanceModel) -> f32 {
     match model {
         DistanceModel::Euclid => euclid(a, b),
         DistanceModel::Detour { k } => euclid(a, b) * k,
-        // Implemented alongside the rest of the geometry work; the default
-        // weights do not select it yet.
-        DistanceModel::RotatedL1 { .. } => unimplemented!("RotatedL1 lands with the water model"),
+        // Streets on a grid: a pipe runs along two axes, not the diagonal.
+        // Rotate the offset back onto those axes, then take Manhattan distance.
+        DistanceModel::RotatedL1 { theta_deg } => {
+            let (sin, cos) = (-theta_deg.to_radians()).sin_cos();
+            let (dx, dy) = (b[0] - a[0], b[1] - a[1]);
+            (dx * cos - dy * sin).abs() + (dx * sin + dy * cos).abs()
+        }
     }
 }
 

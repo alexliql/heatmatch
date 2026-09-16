@@ -11,10 +11,14 @@ use smallvec::SmallVec;
 use thiserror::Error;
 
 use crate::distance::{euclid, pipe_length, search_radius};
+use crate::econ::{self, Connection};
 use crate::frame::LocalFrame;
 use crate::index::{self, SinkPt};
+use crate::season;
+use crate::thermo::{self, HeatPump};
 use crate::types::{Contribution, DataCenter, Match, Region, Sink};
-use crate::weights::{Decay, Weights};
+use crate::water::WaterIndex;
+use crate::weights::{Decay, Econ, WaterPolicy, Weights};
 
 #[derive(Debug, Error, PartialEq)]
 pub enum EngineError {
@@ -32,6 +36,7 @@ struct RegionData {
     sink_xy: Vec<[f32; 2]>,
     tree: RTree<SinkPt>,
     frame: LocalFrame,
+    water: WaterIndex,
 }
 
 pub struct Engine {
@@ -53,12 +58,20 @@ struct Candidate {
     idx: usize,
     dist_m: f32,
     pipe_m: f32,
+    crosses_water: bool,
+    hp: HeatPump,
     raw: f32,
     demand_mwh: f32,
 }
 
 impl Engine {
-    pub fn new(dcs: Vec<DataCenter>, sinks: Vec<Sink>) -> Result<Self, EngineError> {
+    /// Build an engine. `water` polygons are in lon/lat and get projected into
+    /// each region's frame; pass an empty slice when none are available.
+    pub fn new(
+        dcs: Vec<DataCenter>,
+        sinks: Vec<Sink>,
+        water: &[geo::Polygon<f64>],
+    ) -> Result<Self, EngineError> {
         let mut seen = HashMap::new();
         for id in dcs.iter().map(|d| &d.id).chain(sinks.iter().map(|s| &s.id)) {
             if seen.insert(id.clone(), ()).is_some() {
@@ -95,6 +108,7 @@ impl Engine {
                     sinks: region_sinks,
                     sink_xy,
                     tree: index::build(pts),
+                    water: WaterIndex::build(water, &frame),
                     frame,
                 },
             );
@@ -110,13 +124,14 @@ impl Engine {
     }
 
     /// Rank every data center in `region`, best first.
-    pub fn rank(&self, region: Region, w: &Weights) -> Result<Vec<Match>, EngineError> {
+    pub fn rank(&self, region: Region, w: &Weights, e: &Econ) -> Result<Vec<Match>, EngineError> {
         w.validate()?;
+        e.validate()?;
         let data = &self.regions[&region];
         let mut out: Vec<Match> = data
             .dcs
             .iter()
-            .map(|dc| self.score_dc(data, dc, w))
+            .map(|dc| self.score_dc(data, dc, w, e))
             .collect();
         // Ties broken by id so the order never depends on input ordering.
         out.sort_by(|a, b| {
@@ -158,7 +173,18 @@ impl Engine {
             .filter_map(|pt| {
                 let idx = pt.idx as usize;
                 let sink = &data.sinks[idx];
-                let pipe_m = pipe_length(dc_xy, data.sink_xy[idx], &w.distance);
+                let mut pipe_m = pipe_length(dc_xy, data.sink_xy[idx], &w.distance);
+
+                let crosses_water =
+                    !data.water.is_empty() && data.water.crosses(dc_xy, data.sink_xy[idx]);
+                if crosses_water {
+                    match w.water_crossing {
+                        WaterPolicy::Exclude => return None,
+                        WaterPolicy::Penalty { factor } => pipe_m *= factor,
+                    }
+                }
+                // Checked after the penalty: a crossing that pushes the pipe
+                // past the radius takes the sink out of range.
                 if pipe_m > w.radius_m {
                     return None;
                 }
@@ -181,11 +207,24 @@ impl Engine {
                         0.0
                     };
 
+                // Heat that needs pumping is worth less: cop/(cop+1) is the
+                // share of delivered energy that came from the waste heat
+                // rather than from the electricity meter.
+                let hp =
+                    thermo::heat_pump(dc.cooling, sink.cat, w.approach_c, w.hp_carnot_fraction);
+                let hp_factor = if hp.required {
+                    hp.cop / (hp.cop + 1.0)
+                } else {
+                    1.0
+                };
+
                 Some(Candidate {
                     idx,
                     dist_m: euclid(dc_xy, data.sink_xy[idx]),
                     pipe_m,
-                    raw: w.cat[sink.cat] * demand_norm * decay.max(0.0) * bonus,
+                    crosses_water,
+                    hp,
+                    raw: w.cat[sink.cat] * demand_norm * decay.max(0.0) * hp_factor * bonus,
                     demand_mwh,
                 })
             })
@@ -230,6 +269,9 @@ impl Engine {
                     cat: data.sinks[c.idx].cat,
                     dist_m: c.dist_m,
                     pipe_m: c.pipe_m,
+                    crosses_water: c.crosses_water,
+                    hp_required: c.hp.required,
+                    cop: c.hp.cop,
                     delivered_mwh: delivered,
                     score: c.raw * share,
                 }
@@ -255,15 +297,34 @@ impl Engine {
         }
     }
 
-    fn score_dc(&self, data: &RegionData, dc: &DataCenter, w: &Weights) -> Match {
+    fn score_dc(&self, data: &RegionData, dc: &DataCenter, w: &Weights, e: &Econ) -> Match {
         let Allocation {
             contributions,
             supply_mwh,
             demand_mwh_in_radius,
         } = self.contributions(data, dc, w);
 
-        let delivered_mwh: f32 = contributions.iter().map(|c| c.delivered_mwh).sum();
         let score: f32 = contributions.iter().map(|c| c.score).sum();
+
+        // Seasonality decides how much of the allocation can actually be used:
+        // heat produced in a month nobody needs it is wasted.
+        let allocated: Vec<(crate::types::SinkCat, f32)> = contributions
+            .iter()
+            .filter(|c| c.delivered_mwh > 0.0)
+            .map(|c| (c.cat, c.delivered_mwh))
+            .collect();
+        let (utilization, delivered_mwh) = season::utilization(supply_mwh, &allocated);
+
+        let connections: Vec<Connection> = contributions
+            .iter()
+            .filter(|c| c.delivered_mwh > 0.0)
+            .map(|c| Connection {
+                pipe_m: c.pipe_m,
+                delivered_mwh: c.delivered_mwh,
+                cop: c.hp_required.then_some(c.cop),
+            })
+            .collect();
+        let economics = econ::evaluate(&connections, delivered_mwh, e, w.utilization_hours);
 
         let mut top: SmallVec<[Contribution; 5]> = SmallVec::new();
         top.extend(
@@ -280,15 +341,11 @@ impl Engine {
             score,
             supply_mwh,
             demand_mwh_in_radius,
-            // Allocation can never hand out more than the budget, so any
-            // excess is f32 accumulation error from summing per-sink
-            // deliveries. Clamp rather than surface a 100.0001% utilization.
-            utilization: if supply_mwh > 0.0 {
-                (delivered_mwh / supply_mwh).clamp(0.0, 1.0)
-            } else {
-                0.0
-            },
+            utilization,
             delivered_mwh,
+            capex: economics.capex,
+            annual_savings: economics.annual_savings,
+            payback_yrs: economics.payback_yrs,
             top,
         }
     }

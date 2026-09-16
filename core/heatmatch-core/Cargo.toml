@@ -15,6 +15,8 @@ smallvec.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
+# Water polygons are constructed directly in the crossing tests.
+geo.workspace = true
 serde_json.workspace = true
 geojson.workspace = true
 approx = "0.5"
