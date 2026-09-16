@@ -24,6 +24,8 @@ web-build: wasm  ## Static export to web/out
 	cd web && pnpm install && pnpm build
 
 check: core-test  ## Everything CI runs
+	cd ingest && uv sync --locked
+	cd ingest && uv run ruff check .
 	cd ingest && uv run pytest
 	cd web && pnpm lint && pnpm typecheck
 
