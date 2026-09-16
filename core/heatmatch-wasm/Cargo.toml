@@ -10,8 +10,10 @@ description = "wasm-bindgen wrapper around heatmatch-core."
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-heatmatch-core = { path = "../heatmatch-core" }
+heatmatch-core = { path = "../heatmatch-core", features = ["ts"] }
 serde.workspace = true
+serde_json.workspace = true
+geo.workspace = true
 geojson.workspace = true
 wasm-bindgen = "0.2"
 serde-wasm-bindgen = "0.6"

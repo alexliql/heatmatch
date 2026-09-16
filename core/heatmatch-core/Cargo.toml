@@ -6,8 +6,15 @@ rust-version.workspace = true
 license.workspace = true
 description = "Waste-heat matching engine: scoring, thermodynamics, economics. No I/O."
 
+[features]
+# Emits TypeScript declarations for the types that cross the wasm boundary.
+# Off by default so native builds and tests never pull in wasm-bindgen.
+ts = ["dep:tsify-next", "dep:wasm-bindgen"]
+
 [dependencies]
 serde.workspace = true
+tsify-next = { version = "0.5", default-features = false, features = ["js"], optional = true }
+wasm-bindgen = { version = "0.2", optional = true }
 geo.workspace = true
 rstar.workspace = true
 enum-map.workspace = true

@@ -17,13 +17,16 @@ core-test:  ## cargo fmt check + clippy + tests for the Rust workspace
 wasm:  ## Build the wasm package into web/src/wasm (not committed)
 	wasm-pack build core/heatmatch-wasm --target bundler --release --out-dir ../../web/src/wasm
 
+wasm-test: wasm  ## Build the wasm package and run the node smoke test
+	node core/heatmatch-wasm/tests/smoke.mjs
+
 web-dev: wasm  ## Next.js dev server
 	cd web && pnpm install && pnpm dev
 
 web-build: wasm  ## Static export to web/out
 	cd web && pnpm install && pnpm build
 
-check: core-test  ## Everything CI runs
+check: core-test wasm-test  ## Everything CI runs
 	cd ingest && uv sync --locked
 	cd ingest && uv run ruff check .
 	cd ingest && uv run pytest

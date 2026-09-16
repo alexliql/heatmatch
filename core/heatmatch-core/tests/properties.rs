@@ -79,7 +79,8 @@ proptest! {
         let before = engine.rank(Region::Nyc, &base_weights(), &econ()).unwrap();
 
         let mut w = base_weights();
-        w.cat[cat_of(idx)] += bump;
+        let cat = cat_of(idx);
+        w.cat.set(cat, w.cat.get(cat) + bump);
         let after = engine.rank(Region::Nyc, &w, &econ()).unwrap();
 
         for b in &before {

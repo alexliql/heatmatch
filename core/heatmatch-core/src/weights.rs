@@ -4,7 +4,6 @@
 //! and must stay in step with `ingest/src/ingest/config.py`, which uses the
 //! same radius and pipe-cost figures.
 
-use enum_map::{enum_map, EnumMap};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -16,6 +15,8 @@ use crate::types::{Region, SinkCat};
 /// `{"kind": "detour", "k": 1.3}`.
 #[derive(Clone, Copy, PartialEq, Debug, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
+#[cfg_attr(feature = "ts", derive(tsify_next::Tsify))]
+#[cfg_attr(feature = "ts", tsify(into_wasm_abi, from_wasm_abi))]
 pub enum DistanceModel {
     /// Straight line.
     Euclid,
@@ -28,6 +29,8 @@ pub enum DistanceModel {
 /// How score falls off with pipe length.
 #[derive(Clone, Copy, PartialEq, Debug, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
+#[cfg_attr(feature = "ts", derive(tsify_next::Tsify))]
+#[cfg_attr(feature = "ts", tsify(into_wasm_abi, from_wasm_abi))]
 pub enum Decay {
     /// Reaches zero exactly at the radius.
     Linear,
@@ -38,6 +41,8 @@ pub enum Decay {
 /// What to do about a pipe that would cross open water.
 #[derive(Clone, Copy, PartialEq, Debug, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
+#[cfg_attr(feature = "ts", derive(tsify_next::Tsify))]
+#[cfg_attr(feature = "ts", tsify(into_wasm_abi, from_wasm_abi))]
 pub enum WaterPolicy {
     /// Treat the sink as unreachable.
     Exclude,
@@ -45,11 +50,89 @@ pub enum WaterPolicy {
     Penalty { factor: f32 },
 }
 
+/// Per-category desirability weights.
+///
+/// An explicit struct rather than a map: `serde_wasm_bindgen` turns Rust maps
+/// into a JS `Map`, which serializes to `{}` and is awkward to bind sliders to.
+/// A struct crosses the boundary as a plain object and types exactly.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(tsify_next::Tsify))]
+#[cfg_attr(feature = "ts", tsify(into_wasm_abi, from_wasm_abi))]
+pub struct CatWeights {
+    pub pool: f32,
+    pub hospital: f32,
+    pub university: f32,
+    pub school: f32,
+    pub greenhouse: f32,
+    pub brewery: f32,
+    pub wwtp: f32,
+    pub office: f32,
+    pub residential_multifamily: f32,
+    pub hotel: f32,
+}
+
+impl CatWeights {
+    pub fn get(&self, cat: SinkCat) -> f32 {
+        match cat {
+            SinkCat::Pool => self.pool,
+            SinkCat::Hospital => self.hospital,
+            SinkCat::University => self.university,
+            SinkCat::School => self.school,
+            SinkCat::Greenhouse => self.greenhouse,
+            SinkCat::Brewery => self.brewery,
+            SinkCat::Wwtp => self.wwtp,
+            SinkCat::Office => self.office,
+            SinkCat::ResidentialMultifamily => self.residential_multifamily,
+            SinkCat::Hotel => self.hotel,
+        }
+    }
+
+    pub fn set(&mut self, cat: SinkCat, value: f32) {
+        let slot = match cat {
+            SinkCat::Pool => &mut self.pool,
+            SinkCat::Hospital => &mut self.hospital,
+            SinkCat::University => &mut self.university,
+            SinkCat::School => &mut self.school,
+            SinkCat::Greenhouse => &mut self.greenhouse,
+            SinkCat::Brewery => &mut self.brewery,
+            SinkCat::Wwtp => &mut self.wwtp,
+            SinkCat::Office => &mut self.office,
+            SinkCat::ResidentialMultifamily => &mut self.residential_multifamily,
+            SinkCat::Hotel => &mut self.hotel,
+        };
+        *slot = value;
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (SinkCat, f32)> + '_ {
+        SinkCat::ALL.into_iter().map(|c| (c, self.get(c)))
+    }
+}
+
+impl std::ops::Index<SinkCat> for CatWeights {
+    type Output = f32;
+    fn index(&self, cat: SinkCat) -> &f32 {
+        match cat {
+            SinkCat::Pool => &self.pool,
+            SinkCat::Hospital => &self.hospital,
+            SinkCat::University => &self.university,
+            SinkCat::School => &self.school,
+            SinkCat::Greenhouse => &self.greenhouse,
+            SinkCat::Brewery => &self.brewery,
+            SinkCat::Wwtp => &self.wwtp,
+            SinkCat::Office => &self.office,
+            SinkCat::ResidentialMultifamily => &self.residential_multifamily,
+            SinkCat::Hotel => &self.hotel,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(tsify_next::Tsify))]
+#[cfg_attr(feature = "ts", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct Weights {
     /// Per-category desirability. Pool ranks highest because a pool wants
     /// low-grade heat year-round, which is exactly what a data center has.
-    pub cat: EnumMap<SinkCat, f32>,
+    pub cat: CatWeights,
     pub radius_m: f32,
     pub distance: DistanceModel,
     pub decay: Decay,
@@ -71,9 +154,11 @@ pub struct Weights {
     pub utilization_hours: f32,
 }
 
-/// Cost and price assumptions. Defined now as configuration; the economics
-/// model that consumes it arrives with `econ.rs`.
+/// Cost and price assumptions consumed by `econ`. Planning-grade figures; see
+/// the README's limitations before treating any output as a budget.
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(tsify_next::Tsify))]
+#[cfg_attr(feature = "ts", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct Econ {
     pub pipe_cost_per_m: f32,
     pub hp_capex_per_mw_th: f32,
@@ -114,17 +199,17 @@ fn non_negative(field: &'static str, value: f32) -> Result<(), WeightsError> {
 impl Weights {
     pub fn default_for(region: Region) -> Self {
         Self {
-            cat: enum_map! {
-                SinkCat::Pool => 1.0,
-                SinkCat::Wwtp => 0.9,
-                SinkCat::Greenhouse => 0.9,
-                SinkCat::Hospital => 0.8,
-                SinkCat::Hotel => 0.7,
-                SinkCat::ResidentialMultifamily => 0.6,
-                SinkCat::University => 0.5,
-                SinkCat::Brewery => 0.5,
-                SinkCat::School => 0.3,
-                SinkCat::Office => 0.3,
+            cat: CatWeights {
+                pool: 1.0,
+                wwtp: 0.9,
+                greenhouse: 0.9,
+                hospital: 0.8,
+                hotel: 0.7,
+                residential_multifamily: 0.6,
+                university: 0.5,
+                brewery: 0.5,
+                school: 0.3,
+                office: 0.3,
             },
             radius_m: match region {
                 Region::Nyc => 1000.0,
@@ -151,8 +236,8 @@ impl Weights {
     }
 
     pub fn validate(&self) -> Result<(), WeightsError> {
-        for (_, w) in &self.cat {
-            non_negative("cat weight", *w)?;
+        for (_, w) in self.cat.iter() {
+            non_negative("cat weight", w)?;
         }
         non_negative("steam_bonus", self.steam_bonus)?;
         non_negative("uten_bonus", self.uten_bonus)?;

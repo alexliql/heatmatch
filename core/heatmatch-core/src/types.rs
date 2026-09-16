@@ -9,10 +9,13 @@ use enum_map::Enum;
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 
+/// Stable feature identifier, e.g. `dc_0003` or `s_00142`.
 pub type Id = String;
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Serialize, Deserialize, Enum)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "ts", derive(tsify_next::Tsify))]
+#[cfg_attr(feature = "ts", tsify(into_wasm_abi, from_wasm_abi))]
 pub enum SinkCat {
     Pool,
     Hospital,
@@ -26,8 +29,25 @@ pub enum SinkCat {
     Hotel,
 }
 
+impl SinkCat {
+    pub const ALL: [SinkCat; 10] = [
+        SinkCat::Pool,
+        SinkCat::Hospital,
+        SinkCat::University,
+        SinkCat::School,
+        SinkCat::Greenhouse,
+        SinkCat::Brewery,
+        SinkCat::Wwtp,
+        SinkCat::Office,
+        SinkCat::ResidentialMultifamily,
+        SinkCat::Hotel,
+    ];
+}
+
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "ts", derive(tsify_next::Tsify))]
+#[cfg_attr(feature = "ts", tsify(into_wasm_abi, from_wasm_abi))]
 pub enum Cooling {
     Air,
     RearDoor,
@@ -39,6 +59,8 @@ pub enum Cooling {
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "ts", derive(tsify_next::Tsify))]
+#[cfg_attr(feature = "ts", tsify(into_wasm_abi, from_wasm_abi))]
 pub enum Region {
     Nyc,
     Upstate,
@@ -108,7 +130,10 @@ impl Sink {
 /// One data center → sink pairing, as reported by `explain`.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "ts", derive(tsify_next::Tsify))]
+#[cfg_attr(feature = "ts", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct Contribution {
+    #[cfg_attr(feature = "ts", tsify(type = "string"))]
     pub sink: Id,
     pub cat: SinkCat,
     /// Straight-line distance.
@@ -131,7 +156,10 @@ pub struct Contribution {
 /// A ranked data center.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "ts", derive(tsify_next::Tsify))]
+#[cfg_attr(feature = "ts", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct Match {
+    #[cfg_attr(feature = "ts", tsify(type = "string"))]
     pub dc: Id,
     pub region: Region,
     pub score: f32,
@@ -145,5 +173,6 @@ pub struct Match {
     /// `None` when annual savings are not positive, so payback never reports
     /// a negative or infinite number of years.
     pub payback_yrs: Option<f32>,
+    #[cfg_attr(feature = "ts", tsify(type = "Contribution[]"))]
     pub top: SmallVec<[Contribution; 5]>,
 }
