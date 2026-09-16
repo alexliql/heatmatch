@@ -1,0 +1,33 @@
+{
+  "built_at": "2026-09-16T19:33:17+00:00",
+  "datacenters": {
+    "count": 6,
+    "file": "datacenters.cb321a0f.geojson",
+    "hash": "cb321a0fd56f64599bee7ba4c17706ba7b43303bd6907a338efb59b9927fef2e"
+  },
+  "sinks": {
+    "count": 157,
+    "file": "sinks.78b6e6cb.geojson",
+    "hash": "78b6e6cbb8032032901f203566a6c9da0f639bfced849475ef403bb64b20806b"
+  },
+  "sources": [
+    {
+      "id": "im3_datacenter_atlas",
+      "license": "ODbL-1.0",
+      "note": "IM3 Open Source Data Center Atlas v2026.02.09; derived from OpenStreetMap.",
+      "url": "https://doi.org/10.57931/3017294"
+    },
+    {
+      "id": "osm_overpass",
+      "license": "ODbL-1.0",
+      "note": "\u00a9 OpenStreetMap contributors, via the Overpass API.",
+      "url": "https://www.openstreetmap.org/copyright"
+    },
+    {
+      "id": "census_tiger_state",
+      "license": "public-domain",
+      "note": "US Census Bureau TIGER/Line 2024 state boundaries.",
+      "url": "https://www2.census.gov/geo/tiger/TIGER2024/STATE/tl_2024_us_state.zip"
+    }
+  ]
+}
