@@ -9,10 +9,18 @@ import {
 } from "@tanstack/react-table";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
-import { useFeatureIndex } from "@/lib/features";
+import { useFeatureIndex, type DcProps } from "@/lib/features";
 import { BUCKET_VARS, cssVar, payback, paybackBucket, pct, score } from "@/lib/format";
 import { useStore } from "@/lib/store";
-import type { Match } from "@/lib/types";
+import {
+  CONFIDENCE_LABELS,
+  CONFIDENCE_MARKS,
+  REGION_SHORT_LABELS,
+  REGION_VIEWS,
+  REGION_VIEW_LABELS,
+  REGION_LABELS,
+  type Match,
+} from "@/lib/types";
 import { useCoarsePointer, useLayoutMode } from "@/lib/useMedia";
 
 import { SearchIcon } from "./icons";
@@ -29,6 +37,56 @@ const SORTS = [
 /** One row per site: rank, name, score as a bar, payback, utilization. The
  *  numbers that explain the rank and nothing else; everything further lives
  *  in the detail. */
+/** Which region the map and ranking show. "All" keeps the cross-region view
+ *  the app opens with; picking one narrows both, and points the assumption
+ *  sliders at it. */
+function RegionTabs() {
+  const viewRegion = useStore((s) => s.viewRegion);
+  const setViewRegion = useStore((s) => s.setViewRegion);
+  const results = useStore((s) => s.results);
+
+  // A region with nothing in it is shown but not offered: its absence is
+  // information, and a dead tab is better than a tab that silently empties.
+  const counts = useMemo(() => {
+    const by = new Map<string, number>();
+    for (const m of results) by.set(m.region, (by.get(m.region) ?? 0) + 1);
+    return by;
+  }, [results]);
+
+  return (
+    <div className="seg seg-full region-tabs" role="tablist" aria-label="Region to show">
+      {REGION_VIEWS.map((r) => {
+        const n = r === "all" ? results.length : (counts.get(r) ?? 0);
+        return (
+          <button
+            key={r}
+            role="tab"
+            aria-selected={viewRegion === r}
+            data-active={viewRegion === r}
+            disabled={n === 0}
+            title={`${REGION_VIEW_LABELS[r]} — ${n} site${n === 1 ? "" : "s"}`}
+            onClick={() => setViewRegion(r)}
+          >
+            {REGION_SHORT_LABELS[r]}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** The same reading as the map's markers: a solid disc is a stated capacity,
+ *  an outline is inferred from a building's size. Silent for a region where
+ *  every figure is an estimate, since a mark every row carries says nothing. */
+function ConfidenceMark({ dc }: { dc: DcProps | undefined }) {
+  if (!dc || dc.mw_confidence === "footprint_estimate") return null;
+  return (
+    <span className="conf-mark" title={CONFIDENCE_LABELS[dc.mw_confidence]}>
+      {CONFIDENCE_MARKS[dc.mw_confidence]}
+    </span>
+  );
+}
+
 export function Ranking() {
   const results = useStore((s) => s.results);
   const selectedDc = useStore((s) => s.selectedDc);
@@ -39,6 +97,7 @@ export function Ranking() {
   const prevRanks = useStore((s) => s.prevRanks);
   const lastRankMs = useStore((s) => s.lastRankMs);
   const search = useStore((s) => s.search);
+  const viewRegion = useStore((s) => s.viewRegion);
   const setSearch = useStore((s) => s.setSearch);
   const setVisibleOrder = useStore((s) => s.setVisibleOrder);
   const sheetSnap = useStore((s) => s.sheetSnap);
@@ -50,7 +109,7 @@ export function Ranking() {
   const [searchOpen, setSearchOpen] = useState(false);
 
   // Match carries the data center's id, not its name.
-  const { dcNames } = useFeatureIndex(engine);
+  const { dcNames, dcs } = useFeatureIndex(engine);
 
   const columns = useMemo(
     () => [
@@ -63,8 +122,17 @@ export function Ranking() {
     [dcNames],
   );
 
+  // The region is a choice of *which* list to rank, so it applies before the
+  // numbering: in a single-region view the best site there is #1, not #7. The
+  // name filter below is a find-within-the-list and deliberately does not
+  // renumber.
+  const inView = useMemo(
+    () => (viewRegion === "all" ? results : results.filter((m) => m.region === viewRegion)),
+    [results, viewRegion],
+  );
+
   const table = useReactTable({
-    data: results,
+    data: inView,
     columns,
     state: { sorting },
     onSortingChange: setSorting,
@@ -72,7 +140,7 @@ export function Ranking() {
     getSortedRowModel: getSortedRowModel(),
   });
 
-  const maxScore = useMemo(() => Math.max(0, ...results.map((r) => r.score)) || 1, [results]);
+  const maxScore = useMemo(() => Math.max(0, ...inView.map((r) => r.score)) || 1, [inView]);
 
   // Keep the selected row in view when the selection came from the map.
   const listRef = useRef<HTMLOListElement>(null);
@@ -130,6 +198,18 @@ export function Ranking() {
     );
   }
 
+  if (!inView.length) {
+    return (
+      <>
+        <RegionTabs />
+        <div className="empty">
+          <b>Nothing to rank here</b>
+          No data centers in {REGION_VIEW_LABELS[viewRegion]}.
+        </div>
+      </>
+    );
+  }
+
   const active = sorting[0]?.id ?? "score";
   const setSort = (id: string) =>
     setSorting([{ id, desc: id !== "payback" && id !== "name" }]);
@@ -138,6 +218,7 @@ export function Ranking() {
 
   return (
     <>
+      <RegionTabs />
       <div className="rank-tools">
         {!(compact && showSearch) && <span className="label">Ranked data centers</span>}
         <span className="rank-tools-right">
@@ -218,7 +299,10 @@ export function Ranking() {
                 </span>
                 <span className="rank-name">
                   <b>{dcNames.get(m.dc) ?? m.dc}</b>
-                  <span>{m.region === "nyc" ? "New York City" : "Upstate"}</span>
+                  <span>
+                    {REGION_LABELS[m.region]}
+                    <ConfidenceMark dc={dcs.get(m.dc)} />
+                  </span>
                 </span>
                 <span className="bar-cell">
                   <span>{score(m.score)}</span>

@@ -57,23 +57,27 @@ pub enum Cooling {
     Unknown,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Serialize, Deserialize, Enum)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "ts", derive(tsify_next::Tsify))]
 #[cfg_attr(feature = "ts", tsify(into_wasm_abi, from_wasm_abi))]
 pub enum Region {
     Nyc,
     Upstate,
+    /// Northern Virginia: Loudoun, Prince William, Fairfax, Arlington,
+    /// Alexandria, Manassas and Manassas Park.
+    Nova,
 }
 
 impl Region {
-    pub const ALL: [Region; 2] = [Region::Nyc, Region::Upstate];
+    pub const ALL: [Region; 3] = [Region::Nyc, Region::Upstate, Region::Nova];
 
     /// Projection origin, matching the `origin` values in ingest's config.
     pub fn origin(self) -> (f64, f64) {
         match self {
             Region::Nyc => (40.7128, -74.0060),
             Region::Upstate => (42.90, -75.50),
+            Region::Nova => (39.02, -77.45),
         }
     }
 
@@ -81,8 +85,41 @@ impl Region {
         match self {
             Region::Nyc => "nyc",
             Region::Upstate => "upstate",
+            Region::Nova => "nova",
         }
     }
+}
+
+/// How much to trust a data center's stated capacity.
+///
+/// New York's capacities are all derived from floor area, so the distinction
+/// only starts to matter in Virginia, where county approvals and utility
+/// filings publish real numbers for some sites and nothing at all for others.
+/// Ranking discounts the weaker grades; the reported `supply_mwh` does not.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "ts", derive(tsify_next::Tsify))]
+#[cfg_attr(feature = "ts", tsify(into_wasm_abi, from_wasm_abi))]
+pub enum MwConfidence {
+    /// The operator published it.
+    Reported,
+    /// A county approval or utility filing states it.
+    Filed,
+    /// Derived from assessed building area on a matched parcel.
+    ParcelEstimate,
+    /// Derived from a footprint with no parcel match — the weakest grade, and
+    /// the default, so an unlabelled feature is never flattered.
+    #[default]
+    FootprintEstimate,
+}
+
+impl MwConfidence {
+    pub const ALL: [MwConfidence; 4] = [
+        MwConfidence::Reported,
+        MwConfidence::Filed,
+        MwConfidence::ParcelEstimate,
+        MwConfidence::FootprintEstimate,
+    ];
 }
 
 /// A waste-heat source. Extra ingest-only fields (`mw_source`, `sources`) are
@@ -97,6 +134,14 @@ pub struct DataCenter {
     pub mw: f32,
     #[serde(default)]
     pub cooling: Cooling,
+    /// Defaults to the weakest grade, so a feature predating this field is
+    /// treated as a guess rather than silently trusted.
+    #[serde(default)]
+    pub mw_confidence: MwConfidence,
+    /// Groups buildings that share one campus, where ingest could establish it.
+    /// Carried through for the UI; scoring stays per building.
+    #[serde(default)]
+    pub campus_id: Option<String>,
     #[serde(default)]
     pub in_steam: bool,
     #[serde(default)]

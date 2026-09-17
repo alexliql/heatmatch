@@ -23,9 +23,14 @@ pub mod water;
 pub mod weights;
 
 pub use scoring::{Engine, EngineError};
+pub use season::{ProfileOverrides, Profiles};
 pub use thermo::{heat_pump, required_temp_c, supply_temp_c, HeatPump};
-pub use types::{Contribution, Cooling, DataCenter, Id, Match, Region, Sink, SinkCat};
-pub use weights::{CatWeights, Decay, DistanceModel, Econ, WaterPolicy, Weights, WeightsError};
+pub use types::{
+    Contribution, Cooling, DataCenter, Id, Match, MwConfidence, Region, Sink, SinkCat,
+};
+pub use weights::{
+    CatWeights, ConfidenceWeights, Decay, DistanceModel, Econ, WaterPolicy, Weights, WeightsError,
+};
 
 /// Version of the scoring model, surfaced through wasm so the UI can show
 /// which engine produced a result.

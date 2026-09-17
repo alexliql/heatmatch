@@ -96,7 +96,8 @@ proptest! {
         let dc = DataCenter {
             id: "dc_0".into(), name: "dc".into(), region: Region::Nyc,
             lat: 40.7128, lon: -74.0060, mw: 1.0,
-            cooling: Default::default(), in_steam: false, in_uten: false,
+            cooling: Default::default(), mw_confidence: Default::default(),
+            campus_id: None, in_steam: false, in_uten: false,
         };
         // 100 m north of the data center, then pushed further north.
         let frame_deg = |m: f64| m / 6_371_000.0f64.to_radians() / 1000.0 * 1000.0;

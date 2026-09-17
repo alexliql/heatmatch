@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { isPlaceholderName, useFeatureIndex } from "@/lib/features";
 import {
@@ -16,7 +16,14 @@ import {
   usd,
 } from "@/lib/format";
 import { useStore } from "@/lib/store";
-import { CAT_LABELS, type SinkCat } from "@/lib/types";
+import {
+  CAT_LABELS,
+  CONFIDENCE_LABELS,
+  CONFIDENCE_MARKS,
+  DEMAND_SOURCE_LABELS,
+  REGION_LABELS,
+  type SinkCat,
+} from "@/lib/types";
 import { useCoarsePointer } from "@/lib/useMedia";
 
 import { DeliveredByCategory } from "./DeliveredByCategory";
@@ -34,9 +41,24 @@ export function DcDetail({ onBack }: { onBack: () => void }) {
   const hoverSink = useStore((s) => s.hoverSink);
   const hoveredSink = useStore((s) => s.hoveredSink);
   const coarse = useCoarsePointer();
+  const viewRegion = useStore((s) => s.viewRegion);
   // Above the early returns: hooks must run in the same order every render.
   const { dcs, sinks } = useFeatureIndex(engine);
   const [hoveredCat, setHoveredCat] = useState<SinkCat | null>(null);
+
+  // Sinks another highly-ranked site also wants. The model allocates each data
+  // center's supply independently, so in a cluster like Ashburn the same pool
+  // can be counted as served by several neighbours at once. Nothing here
+  // resolves that — it just stops the detail view from implying otherwise.
+  const contested = useMemo(() => {
+    const claims = new Map<string, number>();
+    for (const m of results.slice(0, 20)) {
+      for (const c of m.top) {
+        if (c.delivered_mwh > 0) claims.set(c.sink, (claims.get(c.sink) ?? 0) + 1);
+      }
+    }
+    return new Set([...claims].filter(([, n]) => n > 1).map(([sink]) => sink));
+  }, [results]);
 
   if (!selectedDc) {
     return (
@@ -51,8 +73,13 @@ export function DcDetail({ onBack }: { onBack: () => void }) {
   const props = dcs.get(selectedDc);
   if (!match) return null;
 
-  const rank = results.findIndex((r) => r.dc === selectedDc) + 1;
+  // Ranked within the region on show, not globally: the reader arrived from a
+  // list where this site was #1, and "#8 of 303" contradicts it.
+  const inView =
+    viewRegion === "all" ? results : results.filter((r) => r.region === viewRegion);
+  const rank = inView.findIndex((r) => r.dc === selectedDc) + 1;
   const connected = explain.filter((c) => c.delivered_mwh > 0).length;
+
   const heat = cssVar(BUCKET_VARS[paybackBucket(match.payback_yrs)]);
 
   return (
@@ -61,16 +88,24 @@ export function DcDetail({ onBack }: { onBack: () => void }) {
         <div className="detail-head">
           <div style={{ minWidth: 0 }}>
             <div className="label" style={{ marginBottom: 4 }}>
-              #{rank} of {results.length}
+              #{rank} of {inView.length}
             </div>
             <h2 className="detail-title">{props?.name ?? selectedDc}</h2>
             <div className="detail-meta">
-              <span>{match.region === "nyc" ? "New York City" : "Upstate"}</span>
-              <span>
+              <span>{REGION_LABELS[match.region]}</span>
+              <span title={props ? CONFIDENCE_LABELS[props.mw_confidence] : undefined}>
                 <span className="num">{Number(props?.mw ?? 0).toFixed(1)}</span> MW
+                {props && (
+                  <span className="conf-mark">{CONFIDENCE_MARKS[props.mw_confidence]}</span>
+                )}
               </span>
               <span>{props?.cooling ?? "unknown"} cooling</span>
             </div>
+            {props && props.mw_confidence !== "reported" && props.mw_confidence !== "filed" && (
+              <p className="faint" style={{ fontSize: "var(--t-xs)", marginTop: 6 }}>
+                {CONFIDENCE_LABELS[props.mw_confidence]}, not a stated capacity.
+              </p>
+            )}
           </div>
           <div style={{ display: "flex", gap: 2, flex: "0 0 auto" }}>
             <button className="icon-btn" title="Back to ranking" aria-label="Back to ranking" onClick={onBack}>
@@ -164,8 +199,14 @@ export function DcDetail({ onBack }: { onBack: () => void }) {
                               category underneath so the type is never lost. */}
                           <b>{named ? name : label}</b>
                           <span>
-                            {named ? label : "unnamed"}
-                            {c.crosses_water ? " · crosses water" : ""}
+                            {[
+                              named ? label : "unnamed",
+                              DEMAND_SOURCE_LABELS[sinks.get(c.sink)?.demand_source ?? ""],
+                              c.crosses_water ? "crosses water" : "",
+                              contested.has(c.sink) ? "also claimed nearby" : "",
+                            ]
+                              .filter(Boolean)
+                              .join(" · ")}
                           </span>
                         </div>
                       </div>

@@ -35,7 +35,8 @@ export function SeasonStrip({ dcId }: { dcId: string }) {
   const data = useMemo(() => {
     const match = results.find((r) => r.dc === dcId);
     if (!engine || !match) return null;
-    const profiles = engine.profiles();
+    // Shapes are per region: Virginia models its own from ComStock.
+    const profiles = engine.profiles(match.region);
     const connected = explain.filter((c) => c.delivered_mwh > 0);
     // Per category per month, so a hovered month can say who wants the heat.
     const byCat = new Map<SinkCat, number[]>();

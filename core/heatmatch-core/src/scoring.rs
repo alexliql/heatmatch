@@ -14,7 +14,7 @@ use crate::distance::{euclid, pipe_length, search_radius};
 use crate::econ::{self, Connection};
 use crate::frame::LocalFrame;
 use crate::index::{self, SinkPt};
-use crate::season;
+use crate::season::{self, ProfileError, ProfileOverrides, Profiles};
 use crate::thermo::{self, HeatPump};
 use crate::types::{Contribution, DataCenter, Match, Region, Sink};
 use crate::water::WaterIndex;
@@ -28,6 +28,8 @@ pub enum EngineError {
     DuplicateId(String),
     #[error("invalid weights: {0}")]
     Weights(#[from] crate::weights::WeightsError),
+    #[error("invalid seasonal profile: {0}")]
+    Profile(#[from] ProfileError),
 }
 
 struct RegionData {
@@ -37,6 +39,8 @@ struct RegionData {
     tree: RTree<SinkPt>,
     frame: LocalFrame,
     water: WaterIndex,
+    /// The built-in table, unless the bundle overrode it for this region.
+    profiles: Profiles,
 }
 
 pub struct Engine {
@@ -71,6 +75,19 @@ impl Engine {
         dcs: Vec<DataCenter>,
         sinks: Vec<Sink>,
         water: &[geo::Polygon<f64>],
+    ) -> Result<Self, EngineError> {
+        Self::with_profiles(dcs, sinks, water, &HashMap::new())
+    }
+
+    /// Build with per-region seasonal profiles from the data bundle.
+    ///
+    /// Regions absent from `overrides`, and categories absent from a region's
+    /// table, keep the built-in shapes.
+    pub fn with_profiles(
+        dcs: Vec<DataCenter>,
+        sinks: Vec<Sink>,
+        water: &[geo::Polygon<f64>],
+        overrides: &HashMap<Region, ProfileOverrides>,
     ) -> Result<Self, EngineError> {
         let mut seen = HashMap::new();
         for id in dcs.iter().map(|d| &d.id).chain(sinks.iter().map(|s| &s.id)) {
@@ -110,12 +127,21 @@ impl Engine {
                     tree: index::build(pts),
                     water: WaterIndex::build(water, &frame),
                     frame,
+                    profiles: match overrides.get(&region) {
+                        Some(o) => o.resolve()?,
+                        None => season::all_profiles(),
+                    },
                 },
             );
         }
 
         let dc_region = dcs.into_iter().map(|d| (d.id, d.region)).collect();
         Ok(Self { regions, dc_region })
+    }
+
+    /// The seasonal shapes in force for a region, after any bundle override.
+    pub fn profiles(&self, region: Region) -> Profiles {
+        self.regions[&region].profiles
     }
 
     pub fn datacenter(&self, id: &str) -> Option<&DataCenter> {
@@ -224,7 +250,17 @@ impl Engine {
                     pipe_m,
                     crosses_water,
                     hp,
-                    raw: w.cat[sink.cat] * demand_norm * decay.max(0.0) * hp_factor * bonus,
+                    // The confidence discount belongs here rather than on
+                    // `supply_mwh`: a shaky capacity figure should make a site
+                    // rank lower, not make its pipes cheaper or its delivered
+                    // heat smaller. Everything downstream of the allocation
+                    // stays physical.
+                    raw: w.cat[sink.cat]
+                        * w.confidence.get(dc.mw_confidence)
+                        * demand_norm
+                        * decay.max(0.0)
+                        * hp_factor
+                        * bonus,
                     demand_mwh,
                 })
             })
@@ -313,7 +349,8 @@ impl Engine {
             .filter(|c| c.delivered_mwh > 0.0)
             .map(|c| (c.cat, c.delivered_mwh))
             .collect();
-        let (utilization, delivered_mwh) = season::utilization(supply_mwh, &allocated);
+        let (utilization, delivered_mwh) =
+            season::utilization(supply_mwh, &allocated, &data.profiles);
 
         let connections: Vec<Connection> = contributions
             .iter()

@@ -7,7 +7,7 @@
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::types::{Region, SinkCat};
+use crate::types::{MwConfidence, Region, SinkCat};
 
 /// How a straight line between two points becomes a pipe length.
 ///
@@ -126,6 +126,57 @@ impl std::ops::Index<SinkCat> for CatWeights {
     }
 }
 
+/// How much a data center's score is discounted for an uncertain capacity.
+///
+/// A flat struct rather than an `EnumMap`, for the same reason as `CatWeights`:
+/// `serde_wasm_bindgen` turns a Rust map into a JS `Map`, which serializes to
+/// `{}` and cannot be bound to a slider.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(tsify_next::Tsify))]
+#[cfg_attr(feature = "ts", tsify(into_wasm_abi, from_wasm_abi))]
+pub struct ConfidenceWeights {
+    pub reported: f32,
+    pub filed: f32,
+    pub parcel_estimate: f32,
+    pub footprint_estimate: f32,
+}
+
+impl ConfidenceWeights {
+    /// No discount at all — every grade trusted equally.
+    ///
+    /// This is what New York gets, and it is what keeps adding the confidence
+    /// model from moving a single existing number.
+    pub const TRUSTING: Self = Self {
+        reported: 1.0,
+        filed: 1.0,
+        parcel_estimate: 1.0,
+        footprint_estimate: 1.0,
+    };
+
+    pub fn get(&self, c: MwConfidence) -> f32 {
+        match c {
+            MwConfidence::Reported => self.reported,
+            MwConfidence::Filed => self.filed,
+            MwConfidence::ParcelEstimate => self.parcel_estimate,
+            MwConfidence::FootprintEstimate => self.footprint_estimate,
+        }
+    }
+
+    pub fn set(&mut self, c: MwConfidence, value: f32) {
+        let slot = match c {
+            MwConfidence::Reported => &mut self.reported,
+            MwConfidence::Filed => &mut self.filed,
+            MwConfidence::ParcelEstimate => &mut self.parcel_estimate,
+            MwConfidence::FootprintEstimate => &mut self.footprint_estimate,
+        };
+        *slot = value;
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (MwConfidence, f32)> + '_ {
+        MwConfidence::ALL.into_iter().map(|c| (c, self.get(c)))
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(tsify_next::Tsify))]
 #[cfg_attr(feature = "ts", tsify(into_wasm_abi, from_wasm_abi))]
@@ -133,6 +184,10 @@ pub struct Weights {
     /// Per-category desirability. Pool ranks highest because a pool wants
     /// low-grade heat year-round, which is exactly what a data center has.
     pub cat: CatWeights,
+    /// Score multiplier by how well established the data center's capacity is.
+    /// Affects ranking only: `supply_mwh`, `delivered_mwh`, `capex` and
+    /// `payback_yrs` are reported undiscounted.
+    pub confidence: ConfidenceWeights,
     pub radius_m: f32,
     pub distance: DistanceModel,
     pub decay: Decay,
@@ -211,9 +266,22 @@ impl Weights {
                 school: 0.3,
                 office: 0.3,
             },
+            // New York's capacities are uniformly area-derived, so grading them
+            // against each other would be noise. Virginia publishes real numbers
+            // for some sites, which is worth preferring over a footprint guess.
+            confidence: match region {
+                Region::Nyc | Region::Upstate => ConfidenceWeights::TRUSTING,
+                Region::Nova => ConfidenceWeights {
+                    reported: 1.0,
+                    filed: 0.95,
+                    parcel_estimate: 0.7,
+                    footprint_estimate: 0.5,
+                },
+            },
             radius_m: match region {
                 Region::Nyc => 1000.0,
                 Region::Upstate => 4000.0,
+                Region::Nova => 3000.0,
             },
             // Manhattan's street grid runs ~29° off true north, so pipes
             // there follow two axes rather than the diagonal. Upstate has no
@@ -222,6 +290,7 @@ impl Weights {
             distance: match region {
                 Region::Nyc => DistanceModel::RotatedL1 { theta_deg: 29.0 },
                 Region::Upstate => DistanceModel::Detour { k: 1.20 },
+                Region::Nova => DistanceModel::Detour { k: 1.25 },
             },
             decay: Decay::Linear,
             steam_bonus: 0.5,
@@ -238,6 +307,9 @@ impl Weights {
     pub fn validate(&self) -> Result<(), WeightsError> {
         for (_, w) in self.cat.iter() {
             non_negative("cat weight", w)?;
+        }
+        for (_, c) in self.confidence.iter() {
+            non_negative("confidence weight", c)?;
         }
         non_negative("steam_bonus", self.steam_bonus)?;
         non_negative("uten_bonus", self.uten_bonus)?;
@@ -291,13 +363,18 @@ impl Econ {
             pipe_cost_per_m: match region {
                 Region::Nyc => 3000.0,
                 Region::Upstate => 800.0,
+                Region::Nova => 1200.0,
             },
             hp_capex_per_mw_th: 900_000.0,
-            gas_price_per_mwh_th: 45.0,
+            gas_price_per_mwh_th: match region {
+                Region::Nyc | Region::Upstate => 45.0,
+                Region::Nova => 40.0,
+            },
             boiler_eff: 0.85,
             elec_price_per_mwh: match region {
                 Region::Nyc => 150.0,
                 Region::Upstate => 90.0,
+                Region::Nova => 80.0,
             },
             dc_avoided_cooling_per_mwh: 8.0,
         }

@@ -1,4 +1,4 @@
-"""The NYS clip, exercised offline against a committed boundary fixture.
+"""The region clip, exercised offline against a committed boundary fixture.
 
 This matters more than it looks: the nyc bbox in §3.1 crosses the Hudson, so
 without this filter Jersey City facilities enter the dataset as New York ones.
@@ -20,7 +20,10 @@ FIXTURE = Path(__file__).parent / "fixtures" / "nys_boundary_nyc_clip.geojson"
 def _offline_boundary(monkeypatch: pytest.MonkeyPatch) -> None:
     """Serve the real boundary from a fixture so tests never hit the network."""
     geom = shape(json.loads(FIXTURE.read_text())["features"][0]["geometry"])
-    monkeypatch.setattr(boundary, "_nys_prepared", lambda: prep(geom))
+    monkeypatch.setattr(boundary, "_state_prepared", lambda fips: prep(geom))
+    # `_clip` memoizes whatever `_state_prepared` returned, so a cache left over
+    # from another test would quietly outlive this patch.
+    boundary._clip.cache_clear()
 
 
 @pytest.mark.parametrize(
@@ -33,7 +36,7 @@ def _offline_boundary(monkeypatch: pytest.MonkeyPatch) -> None:
         ("Newark, NJ", 40.7357, -74.1724, False),
     ],
 )
-def test_in_nys_separates_new_york_from_new_jersey(
+def test_the_clip_separates_new_york_from_new_jersey(
     name: str, lat: float, lon: float, expected: bool
 ) -> None:
-    assert boundary.in_nys(lat, lon) is expected, name
+    assert boundary.in_region_boundary(lat, lon, "nyc") is expected, name

@@ -4,10 +4,21 @@
 //! not. Matching them month by month rather than annually is what stops a
 //! winter-peaked sink from appearing fully served by a supply that is only
 //! there in July.
+//!
+//! The built-in table is hand-set from the spec. A region may override it with
+//! measured or modelled shapes — Virginia's come from NREL ComStock — which is
+//! why `utilization` takes a table rather than reaching for a constant.
 
 use enum_map::{enum_map, EnumMap};
+use serde::{Deserialize, Serialize};
 
 use crate::types::SinkCat;
+
+/// Share of annual demand falling in each month, January first.
+pub type Profiles = EnumMap<SinkCat, [f32; 12]>;
+
+/// Largest deviation from 1.0 tolerated in a profile row.
+const SUM_TOLERANCE: f32 = 1e-6;
 
 /// Share of annual demand falling in each month, January first. Every row sums
 /// to 1.0; `profiles_sum_to_one` enforces it.
@@ -34,8 +45,58 @@ pub fn profile(cat: SinkCat) -> [f32; 12] {
 }
 
 /// All twelve profiles, for callers that want to hand the whole table out.
-pub fn all_profiles() -> EnumMap<SinkCat, [f32; 12]> {
+pub fn all_profiles() -> Profiles {
     enum_map! { cat => profile(cat) }
+}
+
+/// A profile table as it arrives from a data bundle.
+///
+/// Partial by design: a region supplies shapes only for the categories it has
+/// modelled, and the rest fall back to the built-in table. That is also why
+/// this is not an `EnumMap` — `EnumMap`'s `Deserialize` demands every key.
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct ProfileOverrides(pub std::collections::HashMap<SinkCat, [f32; 12]>);
+
+#[derive(Debug, thiserror::Error, PartialEq)]
+pub enum ProfileError {
+    #[error("{cat:?} profile has a negative share in month {month}: {value}")]
+    Negative {
+        cat: SinkCat,
+        month: usize,
+        value: f32,
+    },
+    #[error("{cat:?} profile sums to {sum}, not 1.0")]
+    NotNormalized { cat: SinkCat, sum: f32 },
+}
+
+impl ProfileOverrides {
+    /// Merge onto the built-in table, rejecting anything that is not a
+    /// distribution. Validated here rather than in a test, because unlike the
+    /// built-in table these numbers arrive at runtime.
+    pub fn resolve(&self) -> Result<Profiles, ProfileError> {
+        let mut out = all_profiles();
+        for (cat, row) in &self.0 {
+            let mut sum = 0.0f32;
+            for (month, &v) in row.iter().enumerate() {
+                // NaN checked explicitly: it would slip past `v < 0.0` and
+                // then poison every month of the overlap.
+                if v.is_nan() || v < 0.0 {
+                    return Err(ProfileError::Negative {
+                        cat: *cat,
+                        month,
+                        value: v,
+                    });
+                }
+                sum += v;
+            }
+            if (sum - 1.0).abs() > SUM_TOLERANCE {
+                return Err(ProfileError::NotNormalized { cat: *cat, sum });
+            }
+            out[*cat] = *row;
+        }
+        Ok(out)
+    }
 }
 
 /// Overlap a flat monthly supply with seasonal demand.
@@ -43,7 +104,7 @@ pub fn all_profiles() -> EnumMap<SinkCat, [f32; 12]> {
 /// Returns `(utilization, delivered_mwh)`. Heat that has no demand in the month
 /// it is produced is simply wasted — there is no inter-seasonal storage in this
 /// model.
-pub fn utilization(supply_mwh: f32, demands: &[(SinkCat, f32)]) -> (f32, f32) {
+pub fn utilization(supply_mwh: f32, demands: &[(SinkCat, f32)], profiles: &Profiles) -> (f32, f32) {
     if supply_mwh <= 0.0 {
         return (0.0, 0.0);
     }
@@ -53,7 +114,7 @@ pub fn utilization(supply_mwh: f32, demands: &[(SinkCat, f32)]) -> (f32, f32) {
     for month in 0..12 {
         let demand: f32 = demands
             .iter()
-            .map(|(cat, mwh)| mwh * profile(*cat)[month])
+            .map(|(cat, mwh)| mwh * profiles[*cat][month])
             .sum();
         delivered += demand.min(monthly_supply);
     }

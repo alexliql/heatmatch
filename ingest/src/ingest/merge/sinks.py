@@ -2,9 +2,10 @@
 
 from pyproj import Geod
 
-from ingest.config import REGIONS, SINK_PREFILTER_SLACK, RegionName
+from ingest.config import COMSTOCK_REGIONS, REGIONS, SINK_PREFILTER_SLACK, RegionName
+from ingest.merge.emit import assign_ids
 from ingest.schema import DataCenter, Sink
-from ingest.sources import ll84, osm, pluto, zones
+from ingest.sources import comstock, ll84, osm, pluto, zones
 
 _GEOD = Geod(ellps="WGS84")
 
@@ -28,7 +29,13 @@ def build(
     regions: list[RegionName], dcs: list[DataCenter], *, refresh: bool = False
 ) -> tuple[list[Sink], dict[str, int]]:
     """Return (sinks, stats). Stats feed the CLI summary table."""
-    stats = {"fetched": 0, "dropped_far": 0, "dropped_steam_heated": 0, "ll84_joined": 0}
+    stats = {
+        "fetched": 0,
+        "dropped_far": 0,
+        "dropped_steam_heated": 0,
+        "ll84_joined": 0,
+        "comstock_modeled": 0,
+    }
     rows: list[dict] = []
 
     for region in regions:
@@ -52,6 +59,18 @@ def build(
             joined = ll84.attach(near, lots, refresh=refresh)
             stats["ll84_joined"] += joined["joined"]
 
+        # Where there is no disclosure to read, model the demand instead. This
+        # replaces the footprint guess for the categories ComStock covers; the
+        # rest keep their category constants and say so via `demand_source`.
+        if region in COMSTOCK_REGIONS and near:
+            table = comstock.build(region, refresh=refresh)["by_type"]
+            for row in near:
+                modelled = comstock.demand_kwh(row["cat"], row.get("area_m2"), table)
+                if modelled is None:
+                    continue
+                row["demand_kwh"], row["demand_source"] = modelled
+                stats["comstock_modeled"] += 1
+
         for row in near:
             # District-steam buildings already have their heat (§3.3).
             if row["steam_heated"]:
@@ -59,5 +78,4 @@ def build(
                 continue
             rows.append(zones.tag(row))
 
-    rows.sort(key=lambda r: (r["lat"], r["lon"], r["name"]))
-    return [Sink(id=f"s_{i:05d}", **r) for i, r in enumerate(rows)], stats
+    return [Sink(id=i, **r) for i, r in assign_ids(rows, "s", 5)], stats

@@ -6,6 +6,10 @@ by PNNL's IM3 project via MSD-LIVE.
 Two things differ from what §3.3 assumed, both verified against the published
 data: the Atlas carries no capacity field (so MW is always estimated from
 footprint area), and it is itself derived from OpenStreetMap under ODbL.
+
+`sqft` is an OpenStreetMap building polygon — a footprint, not floor area —
+which is why the density applied to it is per-region and, for Virginia, the
+lower of the two figures in `config`.
 """
 
 import json
@@ -16,11 +20,12 @@ from ingest.config import (
     ATLAS_URL,
     DEFAULT_DC_MW,
     MAX_ESTIMATED_DC_MW,
-    MW_PER_SQFT,
+    MW_PER_SQFT_BY_REGION,
+    REGIONS,
     RegionName,
     region_for,
 )
-from ingest.sources.boundary import in_nys
+from ingest.sources.boundary import in_region_boundary
 from ingest.sources.fetch import cached_get
 
 
@@ -42,20 +47,24 @@ def candidates(region: RegionName, *, refresh: bool = False) -> Iterator[dict]:
     path = cached_get(ATLAS_URL, "im3_datacenter_centroids.geojson", refresh=refresh)
     features = json.loads(path.read_text())["features"]
 
+    state = REGIONS[region]["state_abb"]
+    per_sqft = MW_PER_SQFT_BY_REGION[region]
+    cap = MAX_ESTIMATED_DC_MW[region]
+
     for feat in features:
         props = feat.get("properties") or {}
-        if str(props.get("state_abb", "")).upper() != "NY":
+        if str(props.get("state_abb", "")).upper() != state:
             continue
         geom = feat.get("geometry") or {}
         if geom.get("type") != "Point":
             continue
         lon, lat = (float(c) for c in geom["coordinates"][:2])
-        if region_for(lat, lon) != region or not in_nys(lat, lon):
+        if region_for(lat, lon) != region or not in_region_boundary(lat, lon, region):
             continue
 
         sqft = props.get("sqft")
         if sqft and float(sqft) > 0:
-            mw = min(float(sqft) * MW_PER_SQFT, MAX_ESTIMATED_DC_MW)
+            mw = min(float(sqft) * per_sqft, cap)
             mw_source = "atlas_sqft"
         else:
             mw, mw_source = DEFAULT_DC_MW, "atlas_default"

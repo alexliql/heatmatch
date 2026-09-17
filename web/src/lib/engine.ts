@@ -17,7 +17,8 @@ export interface Engine {
   explain(dcId: string, weights: Weights): Contribution[];
   defaultWeights(region: Region): Weights;
   defaultEcon(region: Region): Econ;
-  profiles(): Record<string, number[]>;
+  /** Monthly demand shapes for a region, after any bundle override. */
+  profiles(region: Region): Record<string, number[]>;
   version: string;
   manifest: Manifest;
   /** Raw GeoJSON, reused as map sources so they are not fetched twice. */
@@ -65,12 +66,17 @@ export async function loadEngine(onProgress?: (p: LoadProgress) => void): Promis
   // Zones are drawn but never modelled here; the engine reads in_steam/in_uten
   // from the features themselves, which ingest tagged.
   const zones = manifest.zones ? await fetchText(manifest.zones.file) : { text: "", bytes: 0 };
+  // Seasonal shapes for regions that model them rather than using the built-in
+  // table. Absent for a New York-only bundle.
+  const profiles = manifest.profiles
+    ? await fetchText(manifest.profiles.file)
+    : { text: "", bytes: 0 };
 
-  const bytes = dcs.bytes + sinks.bytes + water.bytes + zones.bytes;
+  const bytes = dcs.bytes + sinks.bytes + water.bytes + zones.bytes + profiles.bytes;
   onProgress?.({ stage: "engine", bytes, message: "Starting engine…" });
 
   const wasm = await import("@/wasm/heatmatch_wasm");
-  const inner = new wasm.WasmEngine(dcs.text, sinks.text, water.text);
+  const inner = new wasm.WasmEngine(dcs.text, sinks.text, water.text, profiles.text);
 
   onProgress?.({ stage: "ready", bytes, message: "Ready" });
 
@@ -79,7 +85,7 @@ export async function loadEngine(onProgress?: (p: LoadProgress) => void): Promis
     explain: (dcId, weights) => inner.explain(dcId, weights) as Contribution[],
     defaultWeights: (region) => wasm.WasmEngine.default_weights(region) as Weights,
     defaultEcon: (region) => wasm.WasmEngine.default_econ(region) as Econ,
-    profiles: () => wasm.WasmEngine.profiles() as Record<string, number[]>,
+    profiles: (region) => inner.profiles(region) as Record<string, number[]>,
     version: wasm.WasmEngine.version(),
     manifest,
     geo: {

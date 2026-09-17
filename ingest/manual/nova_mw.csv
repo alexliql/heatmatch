@@ -1,0 +1,37 @@
+# Curated capacities for Northern Virginia data centers.
+#
+# Every other capacity in this dataset is inferred from building footprint
+# area. A row here replaces that inference with a figure someone published.
+#
+# Columns
+#   match_key      Substring matched, case- and punctuation-insensitively,
+#                  against the data center name. "Iron Mountain VA-" matches
+#                  every Iron Mountain VA-n building.
+#   mw             Megawatts. For scope=campus this is the total across every
+#                  building the key matches, split between them pro rata by
+#                  their footprint estimates.
+#   scope          campus (default) or building.
+#   mw_confidence  reported (the operator says so) or filed (a county approval
+#                  or utility filing says so). Ignored while the note is still
+#                  marked UNVERIFIED — those rows are emitted as estimates.
+#   source_url     Where the figure came from. Required. No URL, no row.
+#   source_date    When that source was published or last checked, YYYY-MM-DD.
+#   note           Free text. Rows seeded by an automated research pass begin
+#                  with "UNVERIFIED" and stay estimates until a person reads
+#                  the source and removes that word.
+#
+# KNOWN LIMITATION: published figures are usually *planned* or *approved*
+# capacity, which can exceed what is installed and running today. Where a
+# source distinguishes the two, prefer the operating figure and say which.
+#
+# TO DO: the seeded rows below cover three campuses. The largest capacity in
+# the region — Amazon's Ashburn and Sterling halls, Digital Realty's ACC
+# campus, Equinix Ashburn — is not covered, because those operators do not
+# publish per-campus megawatts. Those need the primary sources the region plan
+# names: Loudoun LOLA and Prince William eDocs land applications, and Dominion
+# Energy's Virginia SCC large-load filings.
+#
+match_key,mw,scope,mw_confidence,source_url,source_date,note
+QTS Manassas,190,campus,reported,https://q.com/data-centers/manassas/,2026-09-17,UNVERIFIED — operator site states 190+ MW critical campus capacity across a planned six-building campus; may exceed what is energised.
+Iron Mountain VA-,280,campus,reported,https://www.ironmountain.com/data-centers/locations/na/virginia,2026-09-17,UNVERIFIED — operator states a 142-acre 280 MW Manassas campus; includes buildings under construction.
+CloudHQ MCC,43,campus,reported,https://www.datacenterfrontier.com/cloud/article/11427576/new-data-center-developers-continue-to-flock-to-northern-virginia,2026-09-17,UNVERIFIED — reported as CloudHQ's first Manassas facility at 43 MW with 35 MW leased to a single tenant.

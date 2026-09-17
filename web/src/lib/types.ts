@@ -12,14 +12,67 @@ export type {
   DistanceModel,
   Econ,
   Match,
+  MwConfidence,
   Region,
   SinkCat,
   WaterPolicy,
   Weights,
 } from "@/wasm/heatmatch_wasm";
 
+// Imported as well as re-exported: the label table below needs it in scope.
+import type { MwConfidence, Region } from "@/wasm/heatmatch_wasm";
+
 /** The regions the data covers, in display order. */
-export const REGIONS = ["nyc", "upstate"] as const;
+export const REGIONS = ["nyc", "upstate", "nova"] as const;
+
+/** The ranking and map can show one region or all of them at once. */
+export type RegionView = Region | "all";
+export const REGION_VIEWS = ["all", ...REGIONS] as const;
+
+/** Display names, in one place: three components used to branch on "nyc". */
+export const REGION_LABELS: Record<Region, string> = {
+  nyc: "New York City",
+  upstate: "Upstate",
+  nova: "N. Virginia",
+};
+
+export const REGION_VIEW_LABELS: Record<RegionView, string> = {
+  all: "All",
+  ...REGION_LABELS,
+};
+
+/** Short forms, for the toggle where four labels must share one row. */
+/** How a capacity figure reads at a glance, matching the map's markers:
+ *  a solid disc is a stated capacity, an outline is a guess from a footprint. */
+export const CONFIDENCE_MARKS: Record<MwConfidence, string> = {
+  reported: "\u25cf",
+  filed: "\u25cf",
+  parcel_estimate: "\u25d0",
+  footprint_estimate: "\u25cb",
+};
+
+export const CONFIDENCE_LABELS: Record<MwConfidence, string> = {
+  reported: "Capacity reported by the operator",
+  filed: "Capacity stated in a county approval or utility filing",
+  parcel_estimate: "Capacity estimated from assessed building area",
+  footprint_estimate: "Capacity estimated from building footprint",
+};
+
+/** How a sink's annual demand was arrived at. Worth showing next to every
+ *  number it produced: in Virginia none of them are measured. */
+export const DEMAND_SOURCE_LABELS: Record<string, string> = {
+  ll84_fuel: "metered",
+  comstock_modeled: "modelled",
+  footprint_estimate: "from footprint",
+  category_default: "assumed",
+};
+
+export const REGION_SHORT_LABELS: Record<RegionView, string> = {
+  all: "All",
+  nyc: "NYC",
+  upstate: "Upstate",
+  nova: "N. Va.",
+};
 
 /** Sink categories in the order the UI lists them. */
 export const SINK_CATS = [
@@ -68,5 +121,7 @@ export interface Manifest {
   sinks: AssetEntry;
   water?: AssetEntry;
   zones?: AssetEntry;
+  /** Per-region seasonal shapes; absent when every region uses the built-ins. */
+  profiles?: AssetEntry;
   sources: SourceEntry[];
 }

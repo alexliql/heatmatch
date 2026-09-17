@@ -1,0 +1,325 @@
+{
+  "nyc": [
+    {
+      "annual_savings": 2388892.0,
+      "capex": 58678960.0,
+      "delivered_mwh": 82827.265625,
+      "demand_mwh_in_radius": 82827.2734375,
+      "name": "33 Whitehall Street",
+      "payback_yrs": 24.56325340270996,
+      "score": 29.82628059387207,
+      "supply_mwh": 197100.0,
+      "utilization": 0.42022964358329773
+    },
+    {
+      "annual_savings": 2452173.75,
+      "capex": 68931536.0,
+      "delivered_mwh": 78007.0625,
+      "demand_mwh_in_radius": 78007.0703125,
+      "name": "111 8 Avenue",
+      "payback_yrs": 28.110380172729492,
+      "score": 28.522624969482422,
+      "supply_mwh": 197100.0,
+      "utilization": 0.3957740366458893
+    },
+    {
+      "annual_savings": 766940.25,
+      "capex": 26226740.0,
+      "delivered_mwh": 23697.755859375,
+      "demand_mwh_in_radius": 262789.40625,
+      "name": "32 Avenue of the Americas",
+      "payback_yrs": 34.19658660888672,
+      "score": 24.04688835144043,
+      "supply_mwh": 25068.75390625,
+      "utilization": 0.9453104734420776
+    },
+    {
+      "annual_savings": 1939983.0,
+      "capex": 72965424.0,
+      "delivered_mwh": 70922.7890625,
+      "demand_mwh_in_radius": 70922.78125,
+      "name": "375 Pearl Street",
+      "payback_yrs": 37.61137390136719,
+      "score": 22.006715774536133,
+      "supply_mwh": 197100.0,
+      "utilization": 0.3598315119743347
+    },
+    {
+      "annual_savings": 1387026.375,
+      "capex": 83023352.0,
+      "delivered_mwh": 139193.921875,
+      "demand_mwh_in_radius": 291145.4375,
+      "name": "56 Hudson Street",
+      "payback_yrs": 59.85708236694336,
+      "score": 21.71305274963379,
+      "supply_mwh": 197100.0,
+      "utilization": 0.706209659576416
+    },
+    {
+      "annual_savings": 1735105.25,
+      "capex": 30699078.0,
+      "delivered_mwh": 52696.87890625,
+      "demand_mwh_in_radius": 52696.875,
+      "name": "85 10 Avenue",
+      "payback_yrs": 17.692920684814453,
+      "score": 20.155288696289062,
+      "supply_mwh": 197100.0,
+      "utilization": 0.2673611342906952
+    },
+    {
+      "annual_savings": 464861.90625,
+      "capex": 14718474.0,
+      "delivered_mwh": 16369.89453125,
+      "demand_mwh_in_radius": 305394.28125,
+      "name": "33 Thomas Street",
+      "payback_yrs": 31.66203498840332,
+      "score": 12.672233581542969,
+      "supply_mwh": 18206.71875,
+      "utilization": 0.8991128206253052
+    },
+    {
+      "annual_savings": 352674.375,
+      "capex": 11467020.0,
+      "delivered_mwh": 11065.8603515625,
+      "demand_mwh_in_radius": 300793.03125,
+      "name": "Digital Realty New York JFK12",
+      "payback_yrs": 32.514469146728516,
+      "score": 8.797342300415039,
+      "supply_mwh": 11826.0,
+      "utilization": 0.9357230067253113
+    },
+    {
+      "annual_savings": 295191.75,
+      "capex": 23573472.0,
+      "delivered_mwh": 10074.4453125,
+      "demand_mwh_in_radius": 11037.736328125,
+      "name": "Dataverge",
+      "payback_yrs": 79.85816955566406,
+      "score": 7.079949855804443,
+      "supply_mwh": 11826.0,
+      "utilization": 0.8518894910812378
+    },
+    {
+      "annual_savings": 323402.25,
+      "capex": 15263641.0,
+      "delivered_mwh": 11109.576171875,
+      "demand_mwh_in_radius": 11404.7353515625,
+      "name": "Verizon — 131 Morgan Avenue",
+      "payback_yrs": 47.197078704833984,
+      "score": 3.273146867752075,
+      "supply_mwh": 19234.98828125,
+      "utilization": 0.5775712728500366
+    },
+    {
+      "annual_savings": 303623.1875,
+      "capex": 11103459.0,
+      "delivered_mwh": 11033.208984375,
+      "demand_mwh_in_radius": 14822.39453125,
+      "name": "Merrill Lynch Data Center",
+      "payback_yrs": 36.56986618041992,
+      "score": 1.0679105520248413,
+      "supply_mwh": 37509.1171875,
+      "utilization": 0.29414740204811096
+    },
+    {
+      "annual_savings": 32640.1875,
+      "capex": 3117414.25,
+      "delivered_mwh": 1249.69775390625,
+      "demand_mwh_in_radius": 1249.69775390625,
+      "name": "Verizon — 175-28 148 Avenue",
+      "payback_yrs": 95.50846862792969,
+      "score": 0.782361626625061,
+      "supply_mwh": 8008.5673828125,
+      "utilization": 0.1560451090335846
+    },
+    {
+      "annual_savings": 77393.546875,
+      "capex": 8184317.0,
+      "delivered_mwh": 1844.22509765625,
+      "demand_mwh_in_radius": 18172.171875,
+      "name": "Verizon — 1741 Richmond Terrace",
+      "payback_yrs": 105.74934387207031,
+      "score": 0.741043210029602,
+      "supply_mwh": 2034.0718994140625,
+      "utilization": 0.90666663646698
+    },
+    {
+      "annual_savings": 60085.390625,
+      "capex": 7817819.0,
+      "delivered_mwh": 1655.9293212890625,
+      "demand_mwh_in_radius": 1655.9293212890625,
+      "name": "Telehouse Teleport",
+      "payback_yrs": 130.11181640625,
+      "score": 0.6758412718772888,
+      "supply_mwh": 41390.41015625,
+      "utilization": 0.040007561445236206
+    }
+  ],
+  "upstate": [
+    {
+      "annual_savings": 3599153.25,
+      "capex": 37322368.0,
+      "delivered_mwh": 102625.125,
+      "demand_mwh_in_radius": 318792.34375,
+      "name": "Unnamed data center",
+      "payback_yrs": 10.369763374328613,
+      "score": 8.542570114135742,
+      "supply_mwh": 155377.078125,
+      "utilization": 0.6604907512664795
+    },
+    {
+      "annual_savings": 447771.1875,
+      "capex": 3088060.5,
+      "delivered_mwh": 9079.412109375,
+      "demand_mwh_in_radius": 839063.8125,
+      "name": "IBM Building",
+      "payback_yrs": 6.896514415740967,
+      "score": 7.508418560028076,
+      "supply_mwh": 9079.412109375,
+      "utilization": 1.0
+    },
+    {
+      "annual_savings": 1561291.625,
+      "capex": 18364306.0,
+      "delivered_mwh": 34276.51171875,
+      "demand_mwh_in_radius": 181830.140625,
+      "name": "US Bitcoin",
+      "payback_yrs": 11.762251853942871,
+      "score": 7.252194404602051,
+      "supply_mwh": 36399.8359375,
+      "utilization": 0.9416666626930237
+    },
+    {
+      "annual_savings": 166323.640625,
+      "capex": 13998072.0,
+      "delivered_mwh": 5395.720703125,
+      "demand_mwh_in_radius": 144709.8125,
+      "name": "Unnamed data center",
+      "payback_yrs": 84.16165161132812,
+      "score": 6.666355133056641,
+      "supply_mwh": 7938.7939453125,
+      "utilization": 0.6796650290489197
+    },
+    {
+      "annual_savings": 370563.59375,
+      "capex": 25286822.0,
+      "delivered_mwh": 6674.6171875,
+      "demand_mwh_in_radius": 10239.03515625,
+      "name": "Unnamed data center",
+      "payback_yrs": 68.23881530761719,
+      "score": 6.438880443572998,
+      "supply_mwh": 24797.939453125,
+      "utilization": 0.2691601514816284
+    },
+    {
+      "annual_savings": 2371305.0,
+      "capex": 22852596.0,
+      "delivered_mwh": 60937.8203125,
+      "demand_mwh_in_radius": 192177.6875,
+      "name": "Databank LGA3",
+      "payback_yrs": 9.637139320373535,
+      "score": 5.661521911621094,
+      "supply_mwh": 116753.3671875,
+      "utilization": 0.521936297416687
+    },
+    {
+      "annual_savings": 274178.5,
+      "capex": 8208871.5,
+      "delivered_mwh": 6064.33984375,
+      "demand_mwh_in_radius": 631360.0625,
+      "name": "Turnkey Internet",
+      "payback_yrs": 29.93988037109375,
+      "score": 5.4412760734558105,
+      "supply_mwh": 6187.9541015625,
+      "utilization": 0.9800233840942383
+    },
+    {
+      "annual_savings": 2288586.75,
+      "capex": 37015400.0,
+      "delivered_mwh": 67646.7421875,
+      "demand_mwh_in_radius": 318518.65625,
+      "name": "fifteenfortyseven CSR ORNY1",
+      "payback_yrs": 16.173912048339844,
+      "score": 5.14786434173584,
+      "supply_mwh": 89591.40625,
+      "utilization": 0.7550584077835083
+    },
+    {
+      "annual_savings": 1985167.0,
+      "capex": 23151632.0,
+      "delivered_mwh": 48023.87109375,
+      "demand_mwh_in_radius": 167372.734375,
+      "name": "Yahoo Lockport Data Center",
+      "payback_yrs": 11.662309646606445,
+      "score": 5.129919528961182,
+      "supply_mwh": 118260.0,
+      "utilization": 0.406087189912796
+    },
+    {
+      "annual_savings": 527605.5,
+      "capex": 7527582.0,
+      "delivered_mwh": 11760.0966796875,
+      "demand_mwh_in_radius": 2558813.5,
+      "name": "Frontier Science",
+      "payback_yrs": 14.267444610595703,
+      "score": 5.004748344421387,
+      "supply_mwh": 11826.0,
+      "utilization": 0.9944272637367249
+    },
+    {
+      "annual_savings": 2329817.5,
+      "capex": 27905366.0,
+      "delivered_mwh": 59814.3828125,
+      "demand_mwh_in_radius": 193677.6875,
+      "name": "Bloomberg Data Center",
+      "payback_yrs": 11.977490425109863,
+      "score": 4.653038501739502,
+      "supply_mwh": 107935.3125,
+      "utilization": 0.5541688203811646
+    },
+    {
+      "annual_savings": 447627.34375,
+      "capex": 7505910.0,
+      "delivered_mwh": 10722.2392578125,
+      "demand_mwh_in_radius": 330283.0625,
+      "name": "Lumen Albany 4",
+      "payback_yrs": 16.768211364746094,
+      "score": 3.1493079662323,
+      "supply_mwh": 11826.0,
+      "utilization": 0.9066665768623352
+    },
+    {
+      "annual_savings": 364020.8125,
+      "capex": 13217545.0,
+      "delivered_mwh": 8707.5302734375,
+      "demand_mwh_in_radius": 32286.296875,
+      "name": "Blockfusion",
+      "payback_yrs": 36.30986022949219,
+      "score": 2.638570785522461,
+      "supply_mwh": 9603.89453125,
+      "utilization": 0.9066665768623352
+    },
+    {
+      "annual_savings": 530437.8125,
+      "capex": 10346066.0,
+      "delivered_mwh": 13677.2705078125,
+      "demand_mwh_in_radius": 112783.9375,
+      "name": "Cable & Wireless Cable Landing Station",
+      "payback_yrs": 19.5047664642334,
+      "score": 1.9410604238510132,
+      "supply_mwh": 21727.91015625,
+      "utilization": 0.6294793486595154
+    },
+    {
+      "annual_savings": 141422.375,
+      "capex": 11658958.0,
+      "delivered_mwh": 4739.7412109375,
+      "demand_mwh_in_radius": 265044.3125,
+      "name": "SU Green Data Center",
+      "payback_yrs": 82.44068908691406,
+      "score": 1.4723143577575684,
+      "supply_mwh": 7195.52978515625,
+      "utilization": 0.6587063670158386
+    }
+  ]
+}
