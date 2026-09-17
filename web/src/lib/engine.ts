@@ -21,7 +21,12 @@ export interface Engine {
   version: string;
   manifest: Manifest;
   /** Raw GeoJSON, reused as map sources so they are not fetched twice. */
-  geo: { datacenters: unknown; sinks: unknown; water: unknown | null };
+  geo: {
+    datacenters: unknown;
+    sinks: unknown;
+    water: unknown | null;
+    zones: unknown | null;
+  };
 }
 
 const BASE = "data";
@@ -57,8 +62,11 @@ export async function loadEngine(onProgress?: (p: LoadProgress) => void): Promis
   // Hydrography is published in a later phase; the engine accepts an empty
   // string and simply never flags a crossing.
   const water = manifest.water ? await fetchText(manifest.water.file) : { text: "", bytes: 0 };
+  // Zones are drawn but never modelled here; the engine reads in_steam/in_uten
+  // from the features themselves, which ingest tagged.
+  const zones = manifest.zones ? await fetchText(manifest.zones.file) : { text: "", bytes: 0 };
 
-  const bytes = dcs.bytes + sinks.bytes + water.bytes;
+  const bytes = dcs.bytes + sinks.bytes + water.bytes + zones.bytes;
   onProgress?.({ stage: "engine", bytes, message: "Starting engine…" });
 
   const wasm = await import("@/wasm/heatmatch_wasm");
@@ -78,6 +86,7 @@ export async function loadEngine(onProgress?: (p: LoadProgress) => void): Promis
       datacenters: JSON.parse(dcs.text),
       sinks: JSON.parse(sinks.text),
       water: water.text ? JSON.parse(water.text) : null,
+      zones: zones.text ? JSON.parse(zones.text) : null,
     },
   };
 }
