@@ -105,7 +105,9 @@ export function Ranking() {
     const next = new Map<string, number>();
     for (const el of items) {
       const dc = el.dataset.dc!;
-      const top = el.getBoundingClientRect().top;
+      // Use offsetTop of the parent <li> instead of getBoundingClientRect().top 
+      // so the coordinate is independent of scroll position.
+      const top = el.parentElement!.offsetTop;
       next.set(dc, top);
       const was = lastRects.current.get(dc);
       if (!reduce && was !== undefined && Math.abs(was - top) > 1) {
