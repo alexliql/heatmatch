@@ -25,6 +25,12 @@ const THEME_KEY = "heatmatch:theme";
  *  list, but not to one clicked on the map: it is already under the cursor. */
 export type SelectionSource = "map" | "list";
 
+/** Resting heights of the phone bottom sheet, as a share of the viewport.
+ *  Full leaves a strip of map: the panel describes the map and should
+ *  never replace it. */
+export type SheetSnap = "peek" | "half" | "full";
+export const SHEET_SNAPS: Record<SheetSnap, number> = { peek: 0.14, half: 0.52, full: 0.86 };
+
 interface State {
   engine: Engine | null;
   progress: LoadProgress | null;
@@ -53,6 +59,8 @@ interface State {
   search: string;
   /** Site ids in the order the ranking currently shows them, for ↑/↓. */
   visibleOrder: string[];
+  /** Where the phone bottom sheet is resting; the panel owns changes. */
+  sheetSnap: SheetSnap;
 
   init: () => Promise<void>;
   setTheme: (theme: Theme) => void;
@@ -67,6 +75,7 @@ interface State {
   markInteracted: () => void;
   setSearch: (search: string) => void;
   setVisibleOrder: (ids: string[]) => void;
+  setSheetSnap: (snap: SheetSnap) => void;
   syncUrl: () => void;
   recompute: () => void;
 }
@@ -127,6 +136,7 @@ export const useStore = create<State>((set, get) => ({
   interacted: false,
   search: "",
   visibleOrder: [],
+  sheetSnap: "half",
 
   init: async () => {
     set({ theme: readTheme() });
@@ -229,6 +239,10 @@ export const useStore = create<State>((set, get) => ({
     const cur = get().visibleOrder;
     if (cur.length === ids.length && cur.every((id, i) => id === ids[i])) return;
     set({ visibleOrder: ids });
+  },
+
+  setSheetSnap: (sheetSnap) => {
+    if (get().sheetSnap !== sheetSnap) set({ sheetSnap });
   },
 
   syncUrl: () => {

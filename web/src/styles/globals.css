@@ -149,7 +149,8 @@ button { background: none; border: 0; padding: 0; cursor: pointer; }
   bottom: calc(var(--inset) + env(safe-area-inset-bottom, 0px) + var(--sheet-h, 0px) + 8px);
   transform: translateX(calc(-50% - var(--panel-w) / 2));
   z-index: 5;
-  max-width: 380px;
+  width: max-content;
+  max-width: min(380px, calc(100vw - 32px));
   padding: var(--s-2) var(--s-4);
   font-size: var(--t-sm);
   color: var(--fg-1);
@@ -319,6 +320,9 @@ button { background: none; border: 0; padding: 0; cursor: pointer; }
 }
 .rank-tools .label { margin: 0; }
 .rank-search { width: 150px; height: 26px; font-size: var(--t-xs); }
+.rank-search[data-open="false"] { display: none; }
+.rank-tools .sort-select { height: 26px; font-size: var(--t-xs); width: auto; }
+.rank-tools-right { display: flex; align-items: center; gap: var(--s-1); }
 .rank-search::-webkit-search-cancel-button { -webkit-appearance: none; }
 
 .rail { padding: 0 var(--s-4) var(--s-1); }
@@ -464,6 +468,7 @@ button { background: none; border: 0; padding: 0; cursor: pointer; }
 .bycat-list li > i { width: 8px; height: 8px; border-radius: 2px; }
 .bycat-list li > b { font-weight: 500; color: var(--fg-0); }
 .tbl tbody tr[data-dim="true"] { opacity: 0.35 !important; }
+.tbl tbody tr[data-active="true"] { background: var(--accent-soft); }
 
 .season { margin-top: var(--s-4); }
 .season-col { outline: none; cursor: default; }
@@ -839,8 +844,8 @@ dialog.about::backdrop { background: rgba(0, 0, 0, 0.45); -webkit-backdrop-filte
 @media (prefers-color-scheme: light) {
   :root:not([data-theme="dark"]) .maplibregl-ctrl-group button .maplibregl-ctrl-icon { filter: none; }
 }
-.maplibregl-ctrl-bottom-right { right: var(--inset); bottom: calc(var(--inset) + env(safe-area-inset-bottom, 0px)); }
-.maplibregl-ctrl-bottom-right .maplibregl-ctrl { margin: 0 0 var(--s-2) 0; }
+.shell .maplibregl-ctrl-bottom-right { right: var(--inset); bottom: calc(var(--inset) + env(safe-area-inset-bottom, 0px)); }
+.shell .maplibregl-ctrl-bottom-right .maplibregl-ctrl { margin: 0 0 var(--s-2) 0; }
 
 .maplibregl-ctrl-attrib {
   background: transparent !important;
@@ -852,38 +857,48 @@ dialog.about::backdrop { background: rgba(0, 0, 0, 0.45); -webkit-backdrop-filte
 .maplibregl-ctrl-attrib a { color: var(--fg-2) !important; }
 .maplibregl-ctrl-attrib.maplibregl-compact { background: color-mix(in srgb, var(--bg-1) 80%, transparent) !important; border-radius: var(--r-sm) !important; }
 .maplibregl-ctrl-attrib-button { filter: invert(0.6); }
-.maplibregl-ctrl-bottom-left { left: auto; right: calc(var(--inset) + 44px); bottom: calc(var(--inset) + env(safe-area-inset-bottom, 0px)); }
-.maplibregl-ctrl-bottom-left .maplibregl-ctrl { margin: 0; }
+.shell .maplibregl-ctrl-bottom-left { left: auto; right: calc(var(--inset) + 44px); bottom: calc(var(--inset) + env(safe-area-inset-bottom, 0px)); }
+.shell .maplibregl-ctrl-bottom-left .maplibregl-ctrl { margin: 0; }
 
 /* -------------------------------------------------------------- Responsive */
 
-@media (max-width: 900px) {
+/* Layout is chosen by shape, not device. A portrait phone or tablet gets a
+   bottom sheet; a short landscape screen gets the side panel, narrowed; a
+   coarse pointer gets bigger targets and tap-friendly inputs. */
+
+/* Compact top bar: wordmark and About only. */
+.topbar[data-compact="true"] { max-width: none; padding-left: var(--s-3); }
+.topbar[data-compact="true"] .tagline { display: none; }
+
+/* ---- Portrait: bottom sheet */
+@media (max-width: 900px) and (orientation: portrait) {
   :root { --panel-w: auto; --inset: 8px; }
 
-  .topbar { max-width: calc(100vw - var(--inset) * 2); right: var(--inset); }
-  .tagline { display: none; }
-
-  /* The panel becomes a bottom sheet with three resting heights. */
   .panel {
     top: auto;
-    left: var(--inset);
-    right: var(--inset);
+    left: 0;
+    right: 0;
     bottom: 0;
     width: auto;
-    height: var(--sheet-h, 46dvh);
-    border-bottom-left-radius: 0;
-    border-bottom-right-radius: 0;
+    height: var(--sheet-h, 52dvh);
+    border-radius: var(--r-lg) var(--r-lg) 0 0;
     border-bottom: 0;
+    /* Opaque: a blur over a moving WebGL canvas is the most expensive thing
+       a phone could be asked to do here. */
+    background: var(--bg-1);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
     transition: height var(--d-slow) var(--ease);
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
   .panel[data-dragging="true"] { transition: none; }
+
+  .sheet-grip { touch-action: none; cursor: grab; }
   .sheet-handle {
     display: grid;
     place-items: center;
-    height: 22px;
-    cursor: grab;
-    touch-action: none;
+    height: 24px;
+    width: 100%;
     border-radius: var(--r-lg) var(--r-lg) 0 0;
   }
   .sheet-handle::before {
@@ -895,12 +910,104 @@ dialog.about::backdrop { background: rgba(0, 0, 0, 0.45); -webkit-backdrop-filte
   }
   .panel-head { padding-top: 0; }
 
-  .legend { bottom: calc(var(--sheet-h, 46dvh) + var(--inset)); width: 190px; transition: bottom var(--d-slow) var(--ease), width var(--d-slow) var(--ease); }
-  .maplibregl-ctrl-bottom-right { bottom: calc(var(--sheet-h, 46dvh) + var(--inset)); transition: bottom var(--d-slow) var(--ease); }
-  .maplibregl-ctrl-bottom-left { display: none; }
+  /* One line while the sheet is peeking. */
+  .peek {
+    display: flex;
+    align-items: baseline;
+    gap: var(--s-2);
+    width: 100%;
+    padding: 2px var(--s-3) var(--s-3);
+    font-size: var(--t-sm);
+    text-align: left;
+    min-height: 34px;
+  }
+  .peek b { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .peek .num { color: var(--fg-1); flex: 0 0 auto; }
+  .peek .faint { flex: 0 0 auto; }
+
+  .legend {
+    bottom: calc(var(--sheet-h, 52dvh) + var(--inset));
+    width: min(260px, calc(100vw - 16px));
+    max-height: calc(100dvh - var(--sheet-h, 52dvh) - 110px);
+    transition: bottom var(--d-slow) var(--ease), width var(--d-slow) var(--ease);
+  }
+  .legend[data-open="false"] { width: auto; }
+  .legend-cats { display: flex; flex-wrap: wrap; gap: 4px 10px; }
+
+  /* Above the folded legend, which sits on the sheet's edge. */
+  .hint { bottom: calc(var(--sheet-h, 52dvh) + 56px); }
+
+  .shell .maplibregl-ctrl-bottom-right { bottom: calc(var(--sheet-h, 52dvh) + var(--inset)); transition: bottom var(--d-slow) var(--ease); }
+  .shell .maplibregl-ctrl-bottom-left { display: none; }
+
+  /* Less chrome above the rows: the tools row carries a sort select and a
+     search toggle; the column header goes; the rail only shows at full. */
+  .rank-tools { padding: var(--s-2) var(--s-3); }
+  .rank-head { display: none; }
+  .rail[data-sheet="peek"], .rail[data-sheet="half"] { display: none; }
 
   .stats { gap: 6px; }
   .stat { padding: var(--s-2) var(--s-3); }
   .stat-v { font-size: var(--t-lg); }
-  .ctl { grid-template-columns: 104px minmax(0, 1fr) 44px; }
+  .ctl { grid-template-columns: minmax(84px, 100px) minmax(0, 1fr) 48px; }
+  .ctl > .ctl-label { white-space: normal; line-height: 1.2; }
+}
+
+/* ---- Short landscape: side panel, narrowed */
+@media (max-height: 520px) and (max-width: 1100px) {
+  :root { --panel-w: 46vw; --inset: 8px; }
+  .topbar { max-width: calc(100vw - var(--panel-w) - var(--inset) * 3); }
+  .panel-head { padding: var(--s-2) var(--s-2) 0; }
+  .seg > button { padding: 4px 8px; }
+  .legend { width: min(220px, calc(54vw - 24px)); max-height: calc(100dvh - 120px); }
+  /* Map controls clear the panel. */
+  .shell .maplibregl-ctrl-bottom-right { right: calc(var(--panel-w) + var(--inset) * 2); }
+  .shell .maplibregl-ctrl-bottom-left { right: calc(var(--panel-w) + var(--inset) * 2 + 44px); }
+  .rail { display: none; }
+  .rank-head { display: none; }
+  .stats { gap: 6px; }
+  .stat { padding: var(--s-2) var(--s-3); }
+  .stat-v { font-size: var(--t-lg); }
+  .ctl { grid-template-columns: minmax(84px, 100px) minmax(0, 1fr) 48px; }
+  .ctl > .ctl-label { white-space: normal; line-height: 1.2; }
+  .hint {
+    transform: translateX(calc(-50% - var(--panel-w) / 2));
+    max-width: calc(100vw - var(--panel-w) - 48px);
+    bottom: calc(var(--inset) + 56px);
+  }
+  .hint[data-hidden="true"] { transform: translateX(calc(-50% - var(--panel-w) / 2)) translateY(6px); }
+}
+
+/* ---- Narrow rows: drop utilization, keep the coloured payback. */
+@media (max-width: 420px) {
+  .rank-row, .rank-head { grid-template-columns: 20px minmax(0, 1fr) 52px 50px; }
+  .rank-row > .rank-num:last-child, .rank-head > button:last-child { display: none; }
+  .facts { grid-template-columns: repeat(3, 1fr); }
+}
+
+/* ---- Touch */
+@media (pointer: coarse) {
+  .icon-btn { width: 40px; height: 40px; }
+  .legend > button { min-height: 40px; }
+  .seg > button { min-height: 34px; }
+  .rank-row { min-height: 56px; }
+  .tbl th, .tbl td { padding-top: 9px; padding-bottom: 9px; }
+  .group > summary { min-height: 48px; }
+  .kbd { display: none; }
+
+  /* Sliders: a bigger thumb and a taller strip to land a finger on. */
+  input[type="range"] { height: 32px; }
+  input[type="range"]::-webkit-slider-thumb { width: 20px; height: 20px; margin-top: -8.5px; }
+  input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; }
+  .ctl { min-height: 36px; }
+
+  /* Below 16px iOS Safari zooms the page on focus. */
+  select, .input, .rank-search, textarea { font-size: 16px; height: 34px; }
+  .input-unit span { height: 34px; }
+
+  /* Pinch zooms; the buttons are clutter. */
+  .shell .maplibregl-ctrl-bottom-right .maplibregl-ctrl-group { display: none; }
+
+  /* Tap toggles replace hover previews; show the hand. */
+  .tbl tbody tr[data-hover], .bycat-bar > i, .bycat-list li, .season-col { cursor: pointer; }
 }
