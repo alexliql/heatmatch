@@ -2,22 +2,22 @@
 
 import { useEffect, useState } from "react";
 
+import { About } from "@/components/About";
 import { DcDetail } from "@/components/DcDetail";
-import { Footer } from "@/components/Footer";
+import { Hint } from "@/components/Hint";
+import { Legend } from "@/components/Legend";
 import { Map } from "@/components/Map";
-import { ResultsTable } from "@/components/ResultsTable";
+import { Panel, type Tab } from "@/components/Panel";
+import { Ranking } from "@/components/Ranking";
+import { TopBar } from "@/components/TopBar";
 import { WeightsPanel } from "@/components/WeightsPanel";
-import { BUCKET_COLORS, BUCKET_LABELS, SINK_COLORS } from "@/lib/format";
-import { CAT_LABELS, SINK_CATS } from "@/lib/types";
 import { useStore } from "@/lib/store";
-
-type Tab = "results" | "tuning" | "detail";
 
 export default function Page() {
   const [tab, setTab] = useState<Tab>("results");
+  const [about, setAbout] = useState(false);
   const init = useStore((s) => s.init);
   const engine = useStore((s) => s.engine);
-  const progress = useStore((s) => s.progress);
   const error = useStore((s) => s.error);
 
   // The engine is WebAssembly and must only load in the browser; the static
@@ -27,12 +27,44 @@ export default function Page() {
   }, [init]);
 
   // Selecting a site should show its detail rather than leaving the reader to
-  // find the tab themselves.
+  // find the tab themselves. Clearing the selection returns to the ranking.
   const selectedDc = useStore((s) => s.selectedDc);
   useEffect(() => {
-    if (selectedDc) setTab("detail");
+    setTab((t) => (selectedDc ? "detail" : t === "detail" ? "results" : t));
   }, [selectedDc]);
 
+  // Keyboard: "/" filters, ↑/↓ walk the ranking, Esc clears. Typing in a
+  // field is left alone, except Esc which always works.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      const typing = t && /^(INPUT|SELECT|TEXTAREA)$/.test(t.tagName);
+      const st = useStore.getState();
+      if (e.key === "Escape") {
+        if (typing) (t as HTMLElement).blur();
+        if (st.search) st.setSearch("");
+        else if (st.selectedDc) st.select(null);
+        return;
+      }
+      if (typing || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === "/") {
+        e.preventDefault();
+        setTab("results");
+        requestAnimationFrame(() => document.querySelector<HTMLInputElement>(".rank-search")?.focus());
+        return;
+      }
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        const order = st.visibleOrder;
+        if (!order.length) return;
+        e.preventDefault();
+        const i = st.selectedDc ? order.indexOf(st.selectedDc) : -1;
+        const next = e.key === "ArrowDown" ? Math.min(order.length - 1, i + 1) : Math.max(0, i - 1);
+        if (order[next] !== st.selectedDc) st.select(order[next], "list");
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   if (error) {
     return (
@@ -41,8 +73,8 @@ export default function Page() {
           <h1>heatmatch could not start</h1>
           <p className="muted">
             This tool runs its model in your browser using WebAssembly. If your browser blocks
-            WebAssembly, or the data failed to load, nothing can be computed — there is no server
-            to fall back to.
+            WebAssembly, or the data failed to load, nothing can be computed — there is no server to
+            fall back to.
           </p>
           <code>{error}</code>
         </div>
@@ -50,78 +82,30 @@ export default function Page() {
     );
   }
 
-  if (!engine) {
-    return (
-      <main className="centered">
-        <div>
-          <h1>heatmatch</h1>
-          <p className="muted">
-            {progress?.message ?? "Starting…"}
-            {progress?.bytes ? ` (${(progress.bytes / 1024).toFixed(0)} KB)` : ""}
-          </p>
-        </div>
-      </main>
-    );
-  }
-
   return (
-    <div className="app">
-      <header className="topbar">
-        <h1>heatmatch</h1>
-        <span className="tagline">
-          Which New York data centers could usefully heat their neighbours?
-        </span>
-        <span className="spacer" />
-      </header>
-
-      <div className="layout">
-        <Map />
-        <aside className="side">
-          <div className="tabs">
-            {(["results", "tuning", "detail"] as const).map((t) => (
-              <button key={t} data-active={tab === t} onClick={() => setTab(t)}>
-                {t === "results" ? "Ranking" : t === "tuning" ? "Assumptions" : "Detail"}
-              </button>
+    <div className="shell">
+      <Map />
+      <TopBar onAbout={() => setAbout(true)} />
+      <Legend />
+      <Hint />
+      <Panel tab={tab} onTab={setTab} onAbout={() => setAbout(true)}>
+        {!engine ? (
+          <ol className="rank-list skel" aria-busy="true" aria-label="Loading ranking">
+            {Array.from({ length: 9 }, (_, i) => (
+              <li key={i} className="skel-row" style={{ animationDelay: `${i * 60}ms` }}>
+                <i /><i /><i /><i /><i />
+              </li>
             ))}
+          </ol>
+        ) : (
+          <div className="tabpane" key={tab}>
+            {tab === "results" && <Ranking />}
+            {tab === "tuning" && <WeightsPanel />}
+            {tab === "detail" && <DcDetail onBack={() => setTab("results")} />}
           </div>
-
-          {tab === "results" && (
-            <>
-              <section className="section">
-                {/* Swatch shapes mirror the map: data centers are circles,
-                    sinks are squares. */}
-                <h2>Data centers — payback</h2>
-                <div className="legend">
-                  {(["fast", "medium", "slow", "none"] as const).map((b) => (
-                    <span key={b}>
-                      <span className="dot" style={{ background: BUCKET_COLORS[b] }} />
-                      {BUCKET_LABELS[b]}
-                    </span>
-                  ))}
-                </div>
-
-                <h2 style={{ marginTop: 12 }}>Heat sinks — type</h2>
-                <div className="legend legend-grid">
-                  {SINK_CATS.map((cat) => (
-                    <span key={cat}>
-                      <span className="swatch" style={{ background: SINK_COLORS[cat] }} />
-                      {CAT_LABELS[cat]}
-                    </span>
-                  ))}
-                </div>
-              </section>
-              <section className="section">
-                <h2>Ranked data centers — all of New York State</h2>
-                <ResultsTable />
-              </section>
-            </>
-          )}
-          {tab === "tuning" && <WeightsPanel />}
-          {tab === "detail" && <DcDetail />}
-        </aside>
-      </div>
-
-      <Footer />
+        )}
+      </Panel>
+      <About open={about} onClose={() => setAbout(false)} />
     </div>
   );
 }
