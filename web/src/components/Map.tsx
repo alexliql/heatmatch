@@ -26,7 +26,8 @@ import {
   score,
   type Palette,
 } from "@/lib/format";
-import { resolvedTheme, useStore } from "@/lib/store";
+import { SHEET_SNAPS, resolvedTheme, useStore } from "@/lib/store";
+import { isCoarsePointer, layoutMode } from "@/lib/useMedia";
 import { CAT_LABELS, type SinkCat } from "@/lib/types";
 
 import "maplibre-gl/dist/maplibre-gl.css";
@@ -115,16 +116,20 @@ const SINK_ICON = [
 ] as unknown as ExpressionSpecification;
 
 /** How much of the viewport the floating chrome covers, so fits and flights
- *  centre on the visible map rather than the whole canvas. */
+ *  centre on the visible map rather than the whole canvas. Measured from
+ *  the panel itself rather than the CSS variables, which are in dvh. */
 function chromePadding(): PaddingOptions {
-  const cs = getComputedStyle(document.documentElement);
-  const narrow = window.innerWidth <= 900;
-  if (narrow) {
-    const sheet = parseFloat(cs.getPropertyValue("--sheet-h")) || window.innerHeight * 0.46;
-    return { top: 64, left: 24, right: 24, bottom: sheet + 24 };
+  const panel = document.querySelector<HTMLElement>(".panel")?.getBoundingClientRect();
+  const mode = layoutMode();
+  if (mode === "sheet") {
+    // The sheet may still be animating to its new snap; use the target.
+    const sheet = SHEET_SNAPS[useStore.getState().sheetSnap] * window.innerHeight;
+    return { top: 72, left: 24, right: 24, bottom: sheet + 24 };
   }
-  const panel = parseFloat(cs.getPropertyValue("--panel-w")) || 400;
-  return { top: 72, left: 40, right: panel + 48, bottom: 48 };
+  const w = panel?.width ?? 400;
+  return mode === "landscape"
+    ? { top: 64, left: 24, right: w + 24, bottom: 24 }
+    : { top: 72, left: 40, right: w + 48, bottom: 48 };
 }
 
 function dcBounds(engine: Engine): LngLatBoundsLike | null {
@@ -393,7 +398,8 @@ export function Map() {
       if (!m.isStyleLoaded()) setMapError(e.error?.message ?? "map failed to load");
     });
     m.addControl(new AttributionControl({ compact: true }), "bottom-left");
-    m.addControl(new NavigationControl({ showCompass: false }), "bottom-right");
+    // Pinch zooms on touch; the buttons would only cover the map.
+    if (!isCoarsePointer()) m.addControl(new NavigationControl({ showCompass: false }), "bottom-right");
 
     const popup = new Popup({ closeButton: false, closeOnClick: false, offset: 10, maxWidth: "260px" });
 
@@ -418,7 +424,7 @@ export function Map() {
       useStore.getState().hoverDc(null);
       popup.remove();
     });
-    m.on("mouseenter", "sinks-square", (e: MapLayerMouseEvent) => {
+    const showSink = (e: MapLayerMouseEvent) => {
       const f = e.features?.[0];
       if (!f) return;
       const p = f.properties as { name: string; cat: SinkCat; demand_kwh: number };
@@ -434,8 +440,18 @@ export function Map() {
             `<div class="muted num">${sub}${num(Number(p.demand_kwh) / 1000)} MWh/yr</div>`,
         )
         .addTo(m);
-    });
+    };
+    m.on("mouseenter", "sinks-square", showSink);
     m.on("mouseleave", "sinks-square", () => popup.remove());
+    // Touch has no hover: a tap on a sink shows the card, a tap anywhere
+    // else clears it.
+    if (isCoarsePointer()) {
+      m.on("click", "sinks-square", (e) => {
+        showSink(e);
+        e.originalEvent.stopPropagation();
+      });
+      m.on("click", () => popup.remove());
+    }
 
     m.on("dragstart", () => useStore.getState().markInteracted());
 
@@ -588,24 +604,28 @@ export function Map() {
     if (!site) return;
     const region = rs.find((r) => r.dc === selectedDc)?.region;
 
+    // A tick later, so the panel's own reaction to the selection (the
+    // sheet moving to its new snap) is known when the padding is measured.
     const siteZoom = region === "nyc" ? 13.4 : 12.2;
-    if (selectionSource === "list") {
-      m.flyTo({
-        center: site.geometry.coordinates,
-        zoom: siteZoom,
-        padding: chromePadding(),
-        duration: 1100,
-        essential: true,
-      });
-    } else {
-      m.easeTo({
-        center: site.geometry.coordinates,
-        zoom: Math.max(m.getZoom(), Math.min(siteZoom, 12)),
-        padding: chromePadding(),
-        duration: 600,
-        essential: true,
-      });
-    }
+    const fly = setTimeout(() => {
+      if (selectionSource === "list") {
+        m.flyTo({
+          center: site.geometry.coordinates,
+          zoom: siteZoom,
+          padding: chromePadding(),
+          duration: 1100,
+          essential: true,
+        });
+      } else {
+        m.easeTo({
+          center: site.geometry.coordinates,
+          zoom: Math.max(m.getZoom(), Math.min(siteZoom, 12)),
+          padding: chromePadding(),
+          duration: 600,
+          essential: true,
+        });
+      }
+    }, 0);
 
     // A single soft pulse so the eye lands on the mark.
     m.setFilter("dcs-pulse", ["==", ["get", "id"], selectedDc]);
@@ -622,7 +642,10 @@ export function Map() {
       else map.current.setFilter("dcs-pulse", NONE_FILTER);
     };
     raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
+    return () => {
+      clearTimeout(fly);
+      cancelAnimationFrame(raf);
+    };
   }, [selectedDc, gen, engine]);
 
   // Draw the reach rings for the selected site: the radius itself, and the

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { useStore } from "@/lib/store";
+import { useCoarsePointer } from "@/lib/useMedia";
 
 const KEY = "heatmatch:hinted";
 
@@ -12,6 +13,7 @@ export function Hint() {
   const engine = useStore((s) => s.engine);
   const interacted = useStore((s) => s.interacted);
   const [seen, setSeen] = useState(true);
+  const coarse = useCoarsePointer();
 
   useEffect(() => {
     try {
@@ -33,8 +35,8 @@ export function Hint() {
   if (!engine || seen) return null;
   return (
     <div className="hint float" data-hidden={interacted} aria-live="polite">
-      Circles are data centers — sized by capacity, coloured by payback. Click one to see who
-      could use its heat.
+      Circles are data centers — sized by capacity, coloured by payback. {coarse ? "Tap" : "Click"}{" "}
+      one to see who could use its heat.
     </div>
   );
 }
