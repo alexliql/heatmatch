@@ -3,7 +3,14 @@
 import { useState } from "react";
 
 import { useStore } from "@/lib/store";
-import { CAT_LABELS, SINK_CATS, type CatWeights, type Weights } from "@/lib/types";
+import {
+  CAT_LABELS,
+  REGIONS,
+  SINK_CATS,
+  type CatWeights,
+  type Region,
+  type Weights,
+} from "@/lib/types";
 
 function Slider({
   label,
@@ -40,9 +47,13 @@ function Slider({
   );
 }
 
+const REGION_LABELS: Record<string, string> = { nyc: "New York City", upstate: "Upstate" };
+
 export function WeightsPanel() {
-  const weights = useStore((s) => s.weights);
-  const econ = useStore((s) => s.econ);
+  const tuningRegion = useStore((s) => s.tuningRegion);
+  const setTuningRegion = useStore((s) => s.setTuningRegion);
+  const weights = useStore((s) => (s.weights ? s.weights[s.tuningRegion] : null));
+  const econ = useStore((s) => (s.econ ? s.econ[s.tuningRegion] : null));
   const setWeights = useStore((s) => s.setWeights);
   const setEcon = useStore((s) => s.setEcon);
   const resetDefaults = useStore((s) => s.resetDefaults);
@@ -74,6 +85,25 @@ export function WeightsPanel() {
 
   return (
     <>
+      <section className="section">
+        <h2>Applies to</h2>
+        <label className="row">
+          <span>Region</span>
+          <select value={tuningRegion} onChange={(e) => setTuningRegion(e.target.value as Region)}>
+            {REGIONS.map((r) => (
+              <option key={r} value={r}>
+                {REGION_LABELS[r]}
+              </option>
+            ))}
+          </select>
+        </label>
+        <p className="muted">
+          Both regions are ranked together, but they are tuned apart: a pipe costs $3,000/m in the
+          city against $800/m upstate, and the default reach differs fourfold. One set of numbers
+          across both would make one of them meaningless.
+        </p>
+      </section>
+
       <section className="section">
         <h2>Sink priorities</h2>
         {SINK_CATS.map((cat) => (

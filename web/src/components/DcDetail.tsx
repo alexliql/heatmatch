@@ -80,6 +80,7 @@ export function DcDetail() {
     <section className="section">
       <h2>{String(props?.name ?? selectedDc)}</h2>
       <dl className="facts">
+        <div><dt>Region</dt><dd>{match.region === "nyc" ? "New York City" : "Upstate"}</dd></div>
         <div><dt>Capacity</dt><dd className="num">{Number(props?.mw ?? 0).toFixed(1)} MW</dd></div>
         <div><dt>Cooling</dt><dd>{String(props?.cooling ?? "unknown")}</dd></div>
         <div><dt>Score</dt><dd className="num">{score(match.score)}</dd></div>

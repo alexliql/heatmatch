@@ -5,7 +5,6 @@ import { useEffect, useState } from "react";
 import { DcDetail } from "@/components/DcDetail";
 import { Footer } from "@/components/Footer";
 import { Map } from "@/components/Map";
-import { RegionToggle } from "@/components/RegionToggle";
 import { ResultsTable } from "@/components/ResultsTable";
 import { WeightsPanel } from "@/components/WeightsPanel";
 import { BUCKET_COLORS, BUCKET_LABELS } from "@/lib/format";
@@ -72,7 +71,6 @@ export default function Page() {
           Which New York data centers could usefully heat their neighbours?
         </span>
         <span className="spacer" />
-        <RegionToggle />
       </header>
 
       <div className="layout">
@@ -100,7 +98,7 @@ export default function Page() {
                 </div>
               </section>
               <section className="section">
-                <h2>Ranked data centers</h2>
+                <h2>Ranked data centers — all of New York State</h2>
                 <ResultsTable />
               </section>
             </>

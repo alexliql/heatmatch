@@ -49,6 +49,12 @@ export function ResultsTable() {
           </>
         ),
       }),
+      // Both regions share one list now, so each row has to say which it is:
+      // a 4 km reach upstate and a 1 km reach in the city are different claims.
+      col.accessor("region", {
+        header: "Region",
+        cell: (c) => (c.getValue() === "nyc" ? "NYC" : "Upstate"),
+      }),
       col.accessor("score", { header: "Score", cell: (c) => score(c.getValue()) }),
       col.accessor("supply_mwh", {
         header: "Supply",

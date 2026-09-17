@@ -74,7 +74,6 @@ export function Map() {
   const map = useRef<MlMap | null>(null);
   const [mapError, setMapError] = useState<string | null>(null);
   const engine = useStore((s) => s.engine);
-  const region = useStore((s) => s.region);
   const results = useStore((s) => s.results);
   const explain = useStore((s) => s.explain);
   const selectedDc = useStore((s) => s.selectedDc);
@@ -92,7 +91,7 @@ export function Map() {
       m = new MlMap({
       container: ref.current,
       style: basemapUrl(),
-      center: CENTERS[useStore.getState().region] ?? CENTERS.nyc,
+      center: CENTERS.nyc,
         zoom: 11,
         attributionControl: false,
       });
@@ -254,13 +253,16 @@ export function Map() {
       | { features: { properties: { id: string }; geometry: { coordinates: [number, number] } }[] }
       | undefined;
     const site = fc?.features.find((f) => f.properties.id === selectedDc);
-    if (!site || !weights) return void src.setData(EMPTY);
+    const region = results.find((m) => m.dc === selectedDc)?.region;
+    if (!site || !weights || !region) return void src.setData(EMPTY);
 
-    const radiusKm = weights.radius_m / 1000;
+    // The site's own region's reach, not whichever region the panel is tuning.
+    const w = weights[region];
+    const radiusKm = w.radius_m / 1000;
     const detour =
-      weights.distance.kind === "detour"
-        ? weights.distance.k
-        : weights.distance.kind === "rotated_l1"
+      w.distance.kind === "detour"
+        ? w.distance.k
+        : w.distance.kind === "rotated_l1"
           ? Math.SQRT2
           : 1;
     src.setData({
@@ -270,7 +272,7 @@ export function Map() {
         circle(site.geometry.coordinates, radiusKm / detour, { steps: 64 }),
       ],
     });
-  }, [selectedDc, weights, engine, styleReady]);
+  }, [selectedDc, weights, engine, styleReady, results]);
 
   // Fade the sinks a selected site cannot reach, rather than hiding them.
   //
@@ -309,10 +311,28 @@ export function Map() {
     ]);
   }, [selectedDc, explain, styleReady]);
 
-  // Recentre when the region changes.
+  // Frame every data center once, rather than centring on a region: the two
+  // are shown together, and New York State does not fit in one sensible
+  // default view.
   useEffect(() => {
-    map.current?.flyTo({ center: CENTERS[region] ?? CENTERS.nyc, zoom: region === "nyc" ? 11 : 7 });
-  }, [region]);
+    const m = map.current;
+    if (!m || !styleReady || !engine) return;
+    const fc = engine.geo.datacenters as
+      | { features: { geometry: { coordinates: [number, number] } }[] }
+      | undefined;
+    const coords = fc?.features.map((f) => f.geometry.coordinates) ?? [];
+    if (coords.length === 0) return;
+
+    const lons = coords.map((c) => c[0]);
+    const lats = coords.map((c) => c[1]);
+    m.fitBounds(
+      [
+        [Math.min(...lons), Math.min(...lats)],
+        [Math.max(...lons), Math.max(...lats)],
+      ],
+      { padding: 60, duration: 0, maxZoom: 11 },
+    );
+  }, [engine, styleReady]);
 
   if (mapError) {
     return (
