@@ -150,8 +150,15 @@ function dcBounds(engine: Engine): LngLatBoundsLike | null {
  *  first load and again after a theme swap, which drops all of it. */
 function buildLayers(m: MlMap, engine: Engine, pal: Palette) {
   // Marks go under the basemap's place names, as on any editorial map; our
-  // own labels go on top so they win collisions against them.
-  const under = m.getStyle().layers.find((l) => l.type === "symbol")?.id;
+  // own labels go on top so they win collisions against them. The anchor is
+  // the start of the label block, the first symbol layer with nothing but
+  // symbols above it, not the first symbol layer in the style: Positron
+  // puts `waterway_label` below every road and building, and anchoring
+  // there buried the marks in light mode.
+  const layers = m.getStyle().layers;
+  let firstLabel = layers.length;
+  for (let i = layers.length - 1; i >= 0 && layers[i].type === "symbol"; i--) firstLabel = i;
+  const under = layers[firstLabel]?.id;
 
   m.addSource("sinks", { type: "geojson", data: engine.geo.sinks as never, promoteId: "id" });
   m.addSource("dcs", { type: "geojson", data: engine.geo.datacenters as never, promoteId: "id" });
