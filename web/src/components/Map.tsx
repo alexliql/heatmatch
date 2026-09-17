@@ -19,6 +19,24 @@ import "maplibre-gl/dist/maplibre-gl.css";
 
 const EMPTY = { type: "FeatureCollection", features: [] } as never;
 
+// CARTO's minimal basemaps. The previous style (OpenFreeMap Liberty) drew a
+// full topographic map — landuse, buildings, every road class — which competed
+// with the data drawn on top of it. These carry coastlines, water, major roads
+// and labels, and little else.
+//
+// Chosen once, at construction, to match the page theme. Switching the OS
+// theme mid-session leaves the map as it was: swapping styles would drop every
+// source and layer added below and they would all have to be rebuilt.
+const BASEMAPS = {
+  dark: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
+  light: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
+} as const;
+
+function basemapUrl(): string {
+  const dark = window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? true;
+  return dark ? BASEMAPS.dark : BASEMAPS.light;
+}
+
 const SINK_OPACITY = 0.75;
 const SINK_RADIUS: ExpressionSpecification = [
   "interpolate", ["linear"], ["zoom"], 10, 2, 15, 5,
@@ -73,7 +91,7 @@ export function Map() {
     try {
       m = new MlMap({
       container: ref.current,
-      style: "https://tiles.openfreemap.org/styles/liberty",
+      style: basemapUrl(),
       center: CENTERS[useStore.getState().region] ?? CENTERS.nyc,
         zoom: 11,
         attributionControl: false,
@@ -98,7 +116,7 @@ export function Map() {
           id: "water-fill",
           type: "fill",
           source: "water",
-          paint: { "fill-color": "#4a90d9", "fill-opacity": 0.25 },
+          paint: { "fill-color": "#4a90d9", "fill-opacity": 0.35 },
         });
       }
 
@@ -112,7 +130,7 @@ export function Map() {
             "fill-color": ["match", ["get", "kind"], "steam", "#d98b4a", "#4ad9a0"],
             // Kept faint: these are approximations, and should read as context
             // rather than as surveyed boundaries.
-            "fill-opacity": 0.12,
+            "fill-opacity": 0.18,
           },
         });
       }
@@ -275,7 +293,7 @@ export function Map() {
       ["literal", explain.map((c) => c.sink)],
     ];
     m.setPaintProperty("sinks-circle", "circle-opacity", [
-      "case", inExplain, 0.95, 0.18,
+      "case", inExplain, 0.95, 0.28,
     ]);
     m.setPaintProperty("sinks-circle", "circle-radius", [
       "case", inExplain, SINK_RADIUS_SELECTED, SINK_RADIUS,
