@@ -1,0 +1,161 @@
+/* Design tokens. Dark is the home theme — the map is the hero and a dark
+   basemap is where a warm heat ramp reads best — with a full light theme
+   behind a toggle. Every colour the page or the map paints is defined here
+   and nowhere else. */
+
+:root {
+  --scheme: dark;
+
+  /* Ground — three surfaces, one hairline, three text weights. */
+  --bg-0: #0d0e11;
+  --bg-1: #15171c;
+  --bg-2: #1d2027;
+  --bg-3: #262a33;
+  --line: rgba(255, 255, 255, 0.08);
+  --line-strong: rgba(255, 255, 255, 0.14);
+  --fg-0: #f2f3f5;
+  --fg-1: #a8adb7;
+  --fg-2: #6b717c;
+
+  /* Selection and attention. One accent, shared by the DOM and the map. */
+  --accent: #3fd3c6;
+  --accent-soft: rgba(63, 211, 198, 0.14);
+
+  /* Payback — a single warm ramp. Hotter is better. */
+  --heat-fast: #ffd166;
+  --heat-medium: #f08a4b;
+  --heat-slow: #b5503f;
+  --heat-none: #585c66;
+
+  /* The field of sinks: one cool, quiet hue until a site is selected. */
+  --sink: #6f8db4;
+
+  /* Sink categories, five families. Members of a family share a hue. */
+  --cat-pool: #5ecbff;
+  --cat-wwtp: #3d9bd1;
+  --cat-hotel: #c9a3ff;
+  --cat-residential: #a07ff0;
+  --cat-office: #7f68c8;
+  --cat-hospital: #ff8fa6;
+  --cat-school: #e86b86;
+  --cat-university: #c4526f;
+  --cat-greenhouse: #7fd88b;
+  --cat-brewery: #bfcf6a;
+
+  /* Territory outline (Con Ed steam). */
+  --zone: #c9a67a;
+
+  /* Halo behind map marks so they separate from the basemap. */
+  --map-halo: #0d0e11;
+
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 32px -8px rgba(0, 0, 0, 0.55);
+
+  /* Type */
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, SFMono-Regular, Menlo, monospace;
+  --t-xs: 11px;
+  --t-sm: 12.5px;
+  --t-md: 14px;
+  --t-lg: 16px;
+  --t-xl: 20px;
+  --t-2xl: 28px;
+
+  /* Rhythm */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 32px;
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  --d-fast: 160ms;
+  --d-slow: 240ms;
+
+  --panel-w: 400px;
+  --inset: 12px;
+}
+
+/* Light theme: applied when chosen, or when the OS prefers it and nothing
+   was chosen. The block is repeated rather than shared because a media
+   query cannot wrap a selector list that also has to match outside it. */
+:root[data-theme="light"] {
+  --scheme: light;
+  --bg-0: #eef0f2;
+  --bg-1: #ffffff;
+  --bg-2: #f4f5f7;
+  --bg-3: #e9ebee;
+  --line: rgba(20, 22, 28, 0.08);
+  --line-strong: rgba(20, 22, 28, 0.16);
+  --fg-0: #16181d;
+  --fg-1: #5b6069;
+  --fg-2: #8c919a;
+
+  --accent: #0e9a90;
+  --accent-soft: rgba(14, 154, 144, 0.12);
+
+  --heat-fast: #e3a100;
+  --heat-medium: #e2702e;
+  --heat-slow: #ad3b2f;
+  --heat-none: #a3a7ae;
+
+  --sink: #7d95b8;
+
+  --cat-pool: #1fa7e6;
+  --cat-wwtp: #1c73b3;
+  --cat-hotel: #9b6ff0;
+  --cat-residential: #7a4fd6;
+  --cat-office: #5c3fae;
+  --cat-hospital: #e8547a;
+  --cat-school: #c93f64;
+  --cat-university: #a12f52;
+  --cat-greenhouse: #3aa653;
+  --cat-brewery: #8f9c2c;
+
+  --zone: #a67c46;
+  --map-halo: #ffffff;
+  --shadow: 0 1px 2px rgba(20, 22, 28, 0.08), 0 12px 32px -8px rgba(20, 22, 28, 0.22);
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]):not([data-theme="light"]) {
+    --scheme: light;
+    --bg-0: #eef0f2;
+    --bg-1: #ffffff;
+    --bg-2: #f4f5f7;
+    --bg-3: #e9ebee;
+    --line: rgba(20, 22, 28, 0.08);
+    --line-strong: rgba(20, 22, 28, 0.16);
+    --fg-0: #16181d;
+    --fg-1: #5b6069;
+    --fg-2: #8c919a;
+
+    --accent: #0e9a90;
+    --accent-soft: rgba(14, 154, 144, 0.12);
+
+    --heat-fast: #e3a100;
+    --heat-medium: #e2702e;
+    --heat-slow: #ad3b2f;
+    --heat-none: #a3a7ae;
+
+    --sink: #7d95b8;
+
+    --cat-pool: #1fa7e6;
+    --cat-wwtp: #1c73b3;
+    --cat-hotel: #9b6ff0;
+    --cat-residential: #7a4fd6;
+    --cat-office: #5c3fae;
+    --cat-hospital: #e8547a;
+    --cat-school: #c93f64;
+    --cat-university: #a12f52;
+    --cat-greenhouse: #3aa653;
+    --cat-brewery: #8f9c2c;
+
+    --zone: #a67c46;
+    --map-halo: #ffffff;
+    --shadow: 0 1px 2px rgba(20, 22, 28, 0.08), 0 12px 32px -8px rgba(20, 22, 28, 0.22);
+  }
+}
