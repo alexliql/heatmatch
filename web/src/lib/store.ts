@@ -13,14 +13,24 @@
 import { create } from "zustand";
 
 import { loadEngine, type Engine, type LoadProgress } from "./engine";
+import { decodeScenario, encodeScenario, readScenarioParam, writeScenarioParam } from "./scenario";
 import { REGIONS, type Contribution, type Econ, type Match, type Region, type Weights } from "./types";
 
 type ByRegion<T> = Record<Region, T>;
+
+export type Theme = "light" | "dark" | "system";
+const THEME_KEY = "heatmatch:theme";
+
+/** Where a selection came from. The map flies to a site picked from the
+ *  list, but not to one clicked on the map: it is already under the cursor. */
+export type SelectionSource = "map" | "list";
 
 interface State {
   engine: Engine | null;
   progress: LoadProgress | null;
   error: string | null;
+
+  theme: Theme;
 
   weights: ByRegion<Weights> | null;
   econ: ByRegion<Econ> | null;
@@ -28,41 +38,107 @@ interface State {
   tuningRegion: Region;
 
   results: Match[];
+  /** Rank per site before the most recent recompute, for showing movement. */
+  prevRanks: Map<string, number>;
   selectedDc: string | null;
+  selectionSource: SelectionSource;
+  hoveredDc: string | null;
+  hoveredSink: string | null;
   explain: Contribution[];
   lastRankMs: number;
 
+  /** Whether the reader has done anything yet; the onboarding hint waits. */
+  interacted: boolean;
+  /** Name filter on the ranking. */
+  search: string;
+  /** Site ids in the order the ranking currently shows them, for ↑/↓. */
+  visibleOrder: string[];
+
   init: () => Promise<void>;
+  setTheme: (theme: Theme) => void;
   setTuningRegion: (region: Region) => void;
   setWeights: (patch: Partial<Weights>) => void;
   setEcon: (patch: Partial<Econ>) => void;
   resetDefaults: () => void;
-  select: (dcId: string | null) => void;
+  resetRegion: (region: Region) => void;
+  select: (dcId: string | null, source?: SelectionSource) => void;
+  hoverDc: (dcId: string | null) => void;
+  hoverSink: (sinkId: string | null) => void;
+  markInteracted: () => void;
+  setSearch: (search: string) => void;
+  setVisibleOrder: (ids: string[]) => void;
+  syncUrl: () => void;
   recompute: () => void;
+}
+
+// The URL follows the scenario, a beat behind the sliders.
+let urlTimer: ReturnType<typeof setTimeout> | undefined;
+function syncUrl(engine: Engine, weights: ByRegion<Weights>, econ: ByRegion<Econ>) {
+  clearTimeout(urlTimer);
+  urlTimer = setTimeout(() => writeScenarioParam(encodeScenario(engine, weights, econ)), 300);
 }
 
 const defaults = <T,>(make: (region: Region) => T): ByRegion<T> =>
   Object.fromEntries(REGIONS.map((r) => [r, make(r)])) as ByRegion<T>;
 
+function readTheme(): Theme {
+  try {
+    const t = localStorage.getItem(THEME_KEY);
+    return t === "light" || t === "dark" ? t : "system";
+  } catch {
+    return "system";
+  }
+}
+
+function applyTheme(theme: Theme) {
+  const root = document.documentElement;
+  if (theme === "system") delete root.dataset.theme;
+  else root.dataset.theme = theme;
+  try {
+    if (theme === "system") localStorage.removeItem(THEME_KEY);
+    else localStorage.setItem(THEME_KEY, theme);
+  } catch {
+    /* private mode; the choice just does not persist */
+  }
+}
+
+/** The theme actually in effect, after "system" is resolved. */
+export function resolvedTheme(theme: Theme): "light" | "dark" {
+  if (theme !== "system") return theme;
+  return window.matchMedia?.("(prefers-color-scheme: light)").matches ? "light" : "dark";
+}
+
 export const useStore = create<State>((set, get) => ({
   engine: null,
   progress: null,
   error: null,
+  theme: "system",
   weights: null,
   econ: null,
   tuningRegion: "nyc",
   results: [],
+  prevRanks: new Map(),
   selectedDc: null,
+  selectionSource: "list",
+  hoveredDc: null,
+  hoveredSink: null,
   explain: [],
   lastRankMs: 0,
+  interacted: false,
+  search: "",
+  visibleOrder: [],
 
   init: async () => {
+    set({ theme: readTheme() });
     try {
       const engine = await loadEngine((progress) => set({ progress }));
+      // A shared link carries its scenario; otherwise the defaults.
+      const param = readScenarioParam();
+      const fromUrl = param ? decodeScenario(engine, param) : null;
       set({
         engine,
-        weights: defaults((r) => engine.defaultWeights(r)),
-        econ: defaults((r) => engine.defaultEcon(r)),
+        weights: fromUrl?.weights ?? defaults((r) => engine.defaultWeights(r)),
+        econ: fromUrl?.econ ?? defaults((r) => engine.defaultEcon(r)),
         error: null,
       });
       get().recompute();
@@ -71,20 +147,30 @@ export const useStore = create<State>((set, get) => ({
     }
   },
 
+  setTheme: (theme) => {
+    applyTheme(theme);
+    set({ theme });
+  },
+
   setTuningRegion: (tuningRegion) => set({ tuningRegion }),
 
   setWeights: (patch) => {
     const { weights, tuningRegion } = get();
     if (!weights) return;
-    set({ weights: { ...weights, [tuningRegion]: { ...weights[tuningRegion], ...patch } } });
+    set({
+      weights: { ...weights, [tuningRegion]: { ...weights[tuningRegion], ...patch } },
+      interacted: true,
+    });
     get().recompute();
+    get().syncUrl();
   },
 
   setEcon: (patch) => {
     const { econ, tuningRegion } = get();
     if (!econ) return;
-    set({ econ: { ...econ, [tuningRegion]: { ...econ[tuningRegion], ...patch } } });
+    set({ econ: { ...econ, [tuningRegion]: { ...econ[tuningRegion], ...patch } }, interacted: true });
     get().recompute();
+    get().syncUrl();
   },
 
   resetDefaults: () => {
@@ -95,11 +181,23 @@ export const useStore = create<State>((set, get) => ({
       econ: defaults((r) => engine.defaultEcon(r)),
     });
     get().recompute();
+    get().syncUrl();
   },
 
-  select: (dcId) => {
+  resetRegion: (region) => {
+    const { engine, weights, econ } = get();
+    if (!engine || !weights || !econ) return;
+    set({
+      weights: { ...weights, [region]: engine.defaultWeights(region) },
+      econ: { ...econ, [region]: engine.defaultEcon(region) },
+    });
+    get().recompute();
+    get().syncUrl();
+  },
+
+  select: (dcId, source = "list") => {
     const { engine, weights, results } = get();
-    set({ selectedDc: dcId });
+    set({ selectedDc: dcId, selectionSource: source, hoveredSink: null, interacted: true });
     if (!engine || !weights || !dcId) return set({ explain: [] });
 
     // Explain with the parameters the site was actually ranked under, which
@@ -113,19 +211,46 @@ export const useStore = create<State>((set, get) => ({
     }
   },
 
+  hoverDc: (hoveredDc) => {
+    if (get().hoveredDc !== hoveredDc) set({ hoveredDc });
+  },
+
+  hoverSink: (hoveredSink) => {
+    if (get().hoveredSink !== hoveredSink) set({ hoveredSink });
+  },
+
+  markInteracted: () => {
+    if (!get().interacted) set({ interacted: true });
+  },
+
+  setSearch: (search) => set({ search }),
+
+  setVisibleOrder: (ids) => {
+    const cur = get().visibleOrder;
+    if (cur.length === ids.length && cur.every((id, i) => id === ids[i])) return;
+    set({ visibleOrder: ids });
+  },
+
+  syncUrl: () => {
+    const { engine, weights, econ } = get();
+    if (engine && weights && econ) syncUrl(engine, weights, econ);
+  },
+
   recompute: () => {
-    const { engine, weights, econ, selectedDc } = get();
+    const { engine, weights, econ, selectedDc, selectionSource, results: before } = get();
     if (!engine || !weights || !econ) return;
     try {
       const t0 = performance.now();
+      const prevRanks = new Map(before.map((m, i) => [m.dc, i + 1]));
       // Ranked per region, then merged: scores are comparable because the
       // score itself is dimensionless, even though the inputs differ.
       const results = REGIONS.flatMap((r) => engine.rank(r, weights[r], econ[r])).sort(
         (a, b) => b.score - a.score || a.dc.localeCompare(b.dc),
       );
-      set({ results, lastRankMs: performance.now() - t0, error: null });
-      // Keep the detail panel in step with the table it was opened from.
-      if (selectedDc) get().select(selectedDc);
+      set({ results, prevRanks, lastRankMs: performance.now() - t0, error: null });
+      // Keep the detail panel in step with the table it was opened from,
+      // without flying the map again.
+      if (selectedDc) get().select(selectedDc, selectionSource);
     } catch (e) {
       set({ error: e instanceof Error ? e.message : String(e) });
     }
