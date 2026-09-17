@@ -39,6 +39,26 @@ def _resolve(region: str) -> list[RegionName]:
     return [region]  # type: ignore[list-item]
 
 
+def _check_writable(region: str, write: bool) -> None:
+    """Refuse a partial run that would publish an incomplete bundle.
+
+    The bundle is one flat set of files covering every region, so a run over
+    one region rewrites them with only that region in it, silently deleting
+    the others. Easy to do by accident and hard to notice afterwards.
+
+    A named function rather than an inline check so the message can be tested
+    directly. Asserting on it through `CliRunner` would mean asserting on
+    Rich-rendered output, which wraps to the terminal width — see this
+    module's tests.
+    """
+    if write and region != "all":
+        raise typer.BadParameter(
+            f"--region {region} would rewrite the whole bundle with only {region} in it, "
+            "dropping every other region. Use --region all to publish, or add --no-write "
+            "to build and summarise without touching data/."
+        )
+
+
 @app.command()
 def run(
     region: str = typer.Option("all", help=f"{' | '.join(REGIONS)} | all"),
@@ -50,15 +70,7 @@ def run(
 ) -> None:
     """Rebuild data/*.geojson and data/manifest.json for the given region(s)."""
     regions = _resolve(region)
-    # The bundle is one flat set of files covering every region, so a partial
-    # run would rewrite them with only the region it built — silently deleting
-    # the others. Easy to do by accident and hard to notice afterwards.
-    if write and region != "all":
-        raise typer.BadParameter(
-            f"--region {region} would rewrite the whole bundle with only {region} in it, "
-            "dropping every other region. Use --region all to publish, or add --no-write "
-            "to build and summarise without touching data/."
-        )
+    _check_writable(region, write)
     typer.echo(f"regions: {', '.join(regions)}")
 
     dcs, curated = datacenters.build(regions, refresh=refresh)
