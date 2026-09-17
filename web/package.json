@@ -2,6 +2,7 @@
   "name": "heatmatch-web",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@12.4.2",
   "scripts": {
     "wasm": "wasm-pack build ../core/heatmatch-wasm --target bundler --release --out-dir ../../web/src/wasm",
     "copy-data": "node scripts/copy-data.mjs",
