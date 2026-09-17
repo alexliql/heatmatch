@@ -7,7 +7,8 @@ import { Footer } from "@/components/Footer";
 import { Map } from "@/components/Map";
 import { ResultsTable } from "@/components/ResultsTable";
 import { WeightsPanel } from "@/components/WeightsPanel";
-import { BUCKET_COLORS, BUCKET_LABELS } from "@/lib/format";
+import { BUCKET_COLORS, BUCKET_LABELS, SINK_COLORS } from "@/lib/format";
+import { CAT_LABELS, SINK_CATS } from "@/lib/types";
 import { useStore } from "@/lib/store";
 
 type Tab = "results" | "tuning" | "detail";
@@ -87,12 +88,24 @@ export default function Page() {
           {tab === "results" && (
             <>
               <section className="section">
-                <h2>Payback</h2>
+                {/* Swatch shapes mirror the map: data centers are circles,
+                    sinks are squares. */}
+                <h2>Data centers — payback</h2>
                 <div className="legend">
                   {(["fast", "medium", "slow", "none"] as const).map((b) => (
                     <span key={b}>
                       <span className="dot" style={{ background: BUCKET_COLORS[b] }} />
                       {BUCKET_LABELS[b]}
+                    </span>
+                  ))}
+                </div>
+
+                <h2 style={{ marginTop: 12 }}>Heat sinks — type</h2>
+                <div className="legend legend-grid">
+                  {SINK_CATS.map((cat) => (
+                    <span key={cat}>
+                      <span className="swatch" style={{ background: SINK_COLORS[cat] }} />
+                      {CAT_LABELS[cat]}
                     </span>
                   ))}
                 </div>

@@ -10,6 +10,8 @@ import {
 } from "@tanstack/react-table";
 import { useMemo, useState } from "react";
 
+import { useFeatureIndex } from "@/lib/features";
+
 import { useStore } from "@/lib/store";
 import { BUCKET_COLORS, num, payback, paybackBucket, pct, score, usd } from "@/lib/format";
 import type { Match } from "@/lib/types";
@@ -23,20 +25,12 @@ export function ResultsTable() {
   const engine = useStore((s) => s.engine);
   const [sorting, setSorting] = useState<SortingState>([{ id: "score", desc: true }]);
 
-  // Match carries the data center's id, not its name; the names live in the
-  // GeoJSON the map already holds.
-  const names = useMemo(() => {
-    const out = new Map<string, string>();
-    const fc = engine?.geo.datacenters as
-      | { features: { properties: { id: string; name: string } }[] }
-      | undefined;
-    for (const f of fc?.features ?? []) out.set(f.properties.id, f.properties.name);
-    return out;
-  }, [engine]);
+  // Match carries the data center's id, not its name.
+  const { dcNames } = useFeatureIndex(engine);
 
   const columns = useMemo(
     () => [
-      col.accessor((m) => names.get(m.dc) ?? m.dc, {
+      col.accessor((m) => dcNames.get(m.dc) ?? m.dc, {
         id: "name",
         header: "Data center",
         cell: (c) => (
@@ -70,7 +64,7 @@ export function ResultsTable() {
         cell: (c) => payback(c.row.original.payback_yrs),
       }),
     ],
-    [names],
+    [dcNames],
   );
 
   const table = useReactTable({

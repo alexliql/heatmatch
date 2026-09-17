@@ -1,5 +1,8 @@
-// Display formatting. Kept in one place so the table, the map popups and the
-// detail panel cannot disagree about how a number reads.
+// Display formatting and the shared visual vocabulary. Kept in one place so
+// the table, the map popups, the legend and the detail panel cannot disagree
+// about how a number reads or what a colour means.
+
+import type { SinkCat } from "./types";
 
 const compactUsd = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -47,3 +50,22 @@ export const BUCKET_LABELS: Record<PaybackBucket, string> = {
   slow: "> 10 yr",
   none: "no payback",
 };
+
+/** Colour per sink category. The single source of truth: the map builds its
+ *  `match` expression from this and the legend reads the same table, so the
+ *  two cannot drift apart. */
+export const SINK_COLORS: Record<SinkCat, string> = {
+  pool: "#00bcd4",
+  wwtp: "#a1887f",
+  greenhouse: "#4caf50",
+  hospital: "#ef5350",
+  hotel: "#ab47bc",
+  residential_multifamily: "#5c6bc0",
+  university: "#26a69a",
+  brewery: "#ffa726",
+  school: "#d4e157",
+  office: "#90a4ae",
+};
+
+/** Fallback when a colour is somehow missing — also the "other" swatch. */
+export const SINK_COLOR_FALLBACK = "#9e9e9e";

@@ -234,3 +234,20 @@ textarea {
 
 .tabs { display: flex; gap: 6px; padding: 8px 14px 0; }
 .tabs button[data-active="true"] { border-color: var(--accent); color: var(--accent); }
+
+/* Legend swatches mirror the map's shapes: circles are data centers, squares
+   are sinks. */
+.swatch {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 6px;
+  border: 1px solid color-mix(in srgb, var(--text) 35%, transparent);
+  vertical-align: baseline;
+}
+
+.legend-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 10px;
+}

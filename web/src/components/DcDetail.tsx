@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 
+import { isPlaceholderName, useFeatureIndex } from "@/lib/features";
 import { useStore } from "@/lib/store";
 import { CAT_LABELS } from "@/lib/types";
 import { num, payback, pct, score, usd } from "@/lib/format";
@@ -57,6 +58,8 @@ export function DcDetail() {
   const explain = useStore((s) => s.explain);
   const results = useStore((s) => s.results);
   const engine = useStore((s) => s.engine);
+  // Above the early returns: hooks must run in the same order every render.
+  const { sinks } = useFeatureIndex(engine);
 
   if (!selectedDc) {
     return (
@@ -110,8 +113,27 @@ export function DcDetail() {
           {explain.slice(0, 40).map((c) => (
             <tr key={c.sink}>
               <td>
-                {CAT_LABELS[c.cat]}
-                {c.crosses_water ? " · crosses water" : ""}
+                {/* The name where OpenStreetMap has one, with the category
+                    underneath so the type is never lost. */}
+                {(() => {
+                  const name = sinks.get(c.sink)?.name;
+                  const named = name && !isPlaceholderName(name);
+                  return named ? (
+                    <>
+                      {name}
+                      <br />
+                      <span className="muted">
+                        {CAT_LABELS[c.cat]}
+                        {c.crosses_water ? " · crosses water" : ""}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      {CAT_LABELS[c.cat]}
+                      {c.crosses_water ? " · crosses water" : ""}
+                    </>
+                  );
+                })()}
               </td>
               <td className="num">{c.pipe_m.toFixed(0)} m</td>
               <td className="num">{c.hp_required ? c.cop.toFixed(1) : "direct"}</td>
