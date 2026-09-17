@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { num } from "@/lib/format";
 import { useStore } from "@/lib/store";
 import { CAT_LABELS, type SinkCat } from "@/lib/types";
+import { useCoarsePointer } from "@/lib/useMedia";
 
 const MONTHS = ["J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"];
 const MONTH_NAMES = [
@@ -29,6 +30,7 @@ export function SeasonStrip({ dcId }: { dcId: string }) {
   const explain = useStore((s) => s.explain);
   const results = useStore((s) => s.results);
   const [month, setMonth] = useState<number | null>(null);
+  const coarse = useCoarsePointer();
 
   const data = useMemo(() => {
     const match = results.find((r) => r.dc === dcId);
@@ -75,7 +77,7 @@ export function SeasonStrip({ dcId }: { dcId: string }) {
         viewBox={`0 0 ${W} ${H}`}
         role="img"
         aria-label="Monthly demand against flat supply"
-        onMouseLeave={() => setMonth(null)}
+        onMouseLeave={coarse ? undefined : () => setMonth(null)}
       >
         {data.monthly.map((v, i) => {
           const x = i * (BAR_W + GAP);
@@ -87,9 +89,11 @@ export function SeasonStrip({ dcId }: { dcId: string }) {
               key={i}
               tabIndex={0}
               className="season-col"
-              onMouseEnter={() => setMonth(i)}
+              // Hover previews on a pointer; a tap toggles and sticks on touch.
+              onMouseEnter={coarse ? undefined : () => setMonth(i)}
+              onClick={coarse ? () => setMonth(month === i ? null : i) : undefined}
               onFocus={() => setMonth(i)}
-              onBlur={() => setMonth(null)}
+              onBlur={coarse ? undefined : () => setMonth(null)}
               onKeyDown={(e) => {
                 if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
                   e.preventDefault();
@@ -170,7 +174,7 @@ export function SeasonStrip({ dcId }: { dcId: string }) {
             <span className="season-key"><b />demand from connected sinks</span>
             <span className="season-key"><i />supply, {num(data.supply)} MWh every month</span>
             <br />
-            Demand below the line is heat with nowhere to go. Hover a month for detail.
+            Demand below the line is heat with nowhere to go. {coarse ? "Tap" : "Hover"} a month for detail.
           </>
         )}
       </figcaption>

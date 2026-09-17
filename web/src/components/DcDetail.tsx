@@ -17,6 +17,7 @@ import {
 } from "@/lib/format";
 import { useStore } from "@/lib/store";
 import { CAT_LABELS, type SinkCat } from "@/lib/types";
+import { useCoarsePointer } from "@/lib/useMedia";
 
 import { DeliveredByCategory } from "./DeliveredByCategory";
 import { BackIcon, CloseIcon } from "./icons";
@@ -31,6 +32,8 @@ export function DcDetail({ onBack }: { onBack: () => void }) {
   const engine = useStore((s) => s.engine);
   const select = useStore((s) => s.select);
   const hoverSink = useStore((s) => s.hoverSink);
+  const hoveredSink = useStore((s) => s.hoveredSink);
+  const coarse = useCoarsePointer();
   // Above the early returns: hooks must run in the same order every render.
   const { dcs, sinks } = useFeatureIndex(engine);
   const [hoveredCat, setHoveredCat] = useState<SinkCat | null>(null);
@@ -146,9 +149,12 @@ export function DcDetail({ onBack }: { onBack: () => void }) {
                     key={c.sink}
                     data-hover
                     data-dim={hoveredCat !== null && hoveredCat !== c.cat}
+                    data-active={hoveredSink === c.sink}
                     style={connectedRow ? undefined : { opacity: 0.55 }}
-                    onMouseEnter={() => hoverSink(c.sink)}
-                    onMouseLeave={() => hoverSink(null)}
+                    // Hover previews on a pointer; a tap toggles on touch.
+                    onMouseEnter={coarse ? undefined : () => hoverSink(c.sink)}
+                    onMouseLeave={coarse ? undefined : () => hoverSink(null)}
+                    onClick={coarse ? () => hoverSink(hoveredSink === c.sink ? null : c.sink) : undefined}
                   >
                     <td>
                       <div className="sink-name">

@@ -13,7 +13,9 @@ import { useFeatureIndex } from "@/lib/features";
 import { BUCKET_VARS, cssVar, payback, paybackBucket, pct, score } from "@/lib/format";
 import { useStore } from "@/lib/store";
 import type { Match } from "@/lib/types";
+import { useCoarsePointer, useLayoutMode } from "@/lib/useMedia";
 
+import { SearchIcon } from "./icons";
 import { ScoreRail } from "./ScoreRail";
 
 const col = createColumnHelper<Match>();
@@ -39,7 +41,13 @@ export function Ranking() {
   const search = useStore((s) => s.search);
   const setSearch = useStore((s) => s.setSearch);
   const setVisibleOrder = useStore((s) => s.setVisibleOrder);
+  const sheetSnap = useStore((s) => s.sheetSnap);
+  const mode = useLayoutMode();
+  const coarse = useCoarsePointer();
+  const compact = mode !== "desktop";
   const [sorting, setSorting] = useState<SortingState>([{ id: "score", desc: true }]);
+  // On a phone the filter box is folded behind an icon until wanted.
+  const [searchOpen, setSearchOpen] = useState(false);
 
   // Match carries the data center's id, not its name.
   const { dcNames } = useFeatureIndex(engine);
@@ -124,20 +132,45 @@ export function Ranking() {
   const setSort = (id: string) =>
     setSorting([{ id, desc: id !== "payback" && id !== "name" }]);
 
+  const showSearch = !compact || searchOpen || search.length > 0;
+
   return (
     <>
       <div className="rank-tools">
-        <span className="label">Ranked data centers</span>
-        <input
-          className="rank-search input"
-          type="search"
-          placeholder="Filter sites…  /"
-          aria-label="Filter sites by name"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
+        {!(compact && showSearch) && <span className="label">Ranked data centers</span>}
+        <span className="rank-tools-right">
+          {compact && (
+            <select
+              className="sort-select"
+              aria-label="Sort by"
+              value={active}
+              onChange={(e) => setSort(e.target.value)}
+            >
+              <option value="score">Score</option>
+              <option value="payback">Payback</option>
+              <option value="utilization">Utilization</option>
+              <option value="name">Name</option>
+            </select>
+          )}
+          <input
+            className="rank-search input"
+            data-open={showSearch}
+            type="search"
+            placeholder={coarse ? "Filter sites…" : "Filter sites…  /"}
+            aria-label="Filter sites by name"
+            value={search}
+            autoFocus={compact && searchOpen}
+            onChange={(e) => setSearch(e.target.value)}
+            onBlur={() => search.length === 0 && setSearchOpen(false)}
+          />
+          {compact && !showSearch && (
+            <button className="icon-btn" aria-label="Filter sites" onClick={() => setSearchOpen(true)}>
+              <SearchIcon />
+            </button>
+          )}
+        </span>
       </div>
-      <ScoreRail />
+      <ScoreRail sheet={mode === "sheet" ? sheetSnap : undefined} />
       <div className="rank-head" aria-hidden>
         <span>#</span>
         <button onClick={() => setSort("name")} data-active={active === "name"}>Site</button>

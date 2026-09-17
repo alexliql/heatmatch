@@ -5,6 +5,7 @@ import { useMemo } from "react";
 import { SINK_VARS, cssVar, num, pct } from "@/lib/format";
 import { useStore } from "@/lib/store";
 import { CAT_LABELS, type SinkCat } from "@/lib/types";
+import { useCoarsePointer } from "@/lib/useMedia";
 
 const TOP = 4;
 
@@ -18,6 +19,11 @@ export function DeliveredByCategory({
   onHoverCat: (cat: SinkCat | null) => void;
 }) {
   const explain = useStore((s) => s.explain);
+  const coarse = useCoarsePointer();
+  // Hover previews on a pointer; a tap toggles on touch.
+  const enter = (cat: SinkCat) => (coarse ? undefined : () => onHoverCat(cat));
+  const leave = coarse ? undefined : () => onHoverCat(null);
+  const tap = (cat: SinkCat) => (coarse ? () => onHoverCat(hoveredCat === cat ? null : cat) : undefined);
 
   const parts = useMemo(() => {
     const byCat = new Map<SinkCat, number>();
@@ -44,23 +50,25 @@ export function DeliveredByCategory({
           {num(parts.total)} MWh/yr delivered
         </span>
       </div>
-      <div className="bycat-bar" onMouseLeave={() => onHoverCat(null)}>
+      <div className="bycat-bar" onMouseLeave={leave}>
         {parts.rows.map((r) => (
           <i
             key={r.cat}
             style={{ flex: r.share, background: cssVar(SINK_VARS[r.cat]) }}
             data-dim={hoveredCat !== null && hoveredCat !== r.cat}
             title={`${CAT_LABELS[r.cat]} · ${num(r.mwh)} MWh · ${pct(r.share)}`}
-            onMouseEnter={() => onHoverCat(r.cat)}
+            onMouseEnter={enter(r.cat)}
+            onClick={tap(r.cat)}
           />
         ))}
       </div>
-      <ul className="bycat-list" onMouseLeave={() => onHoverCat(null)}>
+      <ul className="bycat-list" onMouseLeave={leave}>
         {shown.map((r) => (
           <li
             key={r.cat}
             data-dim={hoveredCat !== null && hoveredCat !== r.cat}
-            onMouseEnter={() => onHoverCat(r.cat)}
+            onMouseEnter={enter(r.cat)}
+            onClick={tap(r.cat)}
           >
             <i style={{ background: cssVar(SINK_VARS[r.cat]) }} />
             <span>{CAT_LABELS[r.cat]}</span>

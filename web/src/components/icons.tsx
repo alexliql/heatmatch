@@ -58,3 +58,10 @@ export const BackIcon = () => (
     <path d="M10 3L5 8l5 5" />
   </svg>
 );
+
+export const SearchIcon = () => (
+  <svg {...base}>
+    <circle cx="7" cy="7" r="4.5" />
+    <path d="M10.5 10.5L14 14" />
+  </svg>
+);

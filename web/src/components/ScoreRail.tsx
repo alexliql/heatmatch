@@ -12,7 +12,7 @@ const PAD = 2;
 
 /** Every site on one score axis. The list hides the gaps; this shows where
  *  the cliffs are. */
-export function ScoreRail() {
+export function ScoreRail({ sheet }: { sheet?: "peek" | "half" | "full" }) {
   const results = useStore((s) => s.results);
   const selectedDc = useStore((s) => s.selectedDc);
   const hoveredDc = useStore((s) => s.hoveredDc);
@@ -27,7 +27,7 @@ export function ScoreRail() {
   const x = (s: number) => PAD + (s / max) * (W - PAD * 2);
 
   return (
-    <div className="rail">
+    <div className="rail" data-sheet={sheet}>
       <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Distribution of scores" onMouseLeave={() => hoverDc(null)}>
         <line x1={PAD} x2={W - PAD} y1={H - 4} y2={H - 4} stroke="var(--line-strong)" strokeWidth={1} />
         {results.map((m) => {
