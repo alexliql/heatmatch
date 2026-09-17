@@ -16,7 +16,7 @@
   "dependencies": {
     "@tanstack/react-table": "^8.21.3",
     "@turf/circle": "^7.4.0",
-    "maplibre-gl": "^6.10.0",
+    "maplibre-gl": "^4.7.1",
     "next": "^15.1.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

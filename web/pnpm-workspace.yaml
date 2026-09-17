@@ -1,2 +1,6 @@
+# pnpm 12 refuses to install until every dependency with a build script is
+# answered for. unrs-resolver is a native module used by eslint's import
+# resolver and ships prebuilt binaries for the platforms we target, so there is
+# nothing to gain from letting its install script run.
 allowBuilds:
-  unrs-resolver: set this to true or false
+  unrs-resolver: false

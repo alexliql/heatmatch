@@ -1,6 +1,6 @@
 "use client";
 
-import type * as maplibregl from "maplibre-gl";
+import type { ExpressionSpecification } from "maplibre-gl";
 import {
   AttributionControl,
   Map as MlMap,
@@ -11,9 +11,22 @@ import {
 import { useEffect, useRef, useState } from "react";
 
 import { useStore } from "@/lib/store";
+import circle from "@turf/circle";
+
 import { BUCKET_COLORS, mw, paybackBucket, score } from "@/lib/format";
 
 import "maplibre-gl/dist/maplibre-gl.css";
+
+const EMPTY = { type: "FeatureCollection", features: [] } as never;
+
+const SINK_OPACITY = 0.75;
+const SINK_RADIUS: ExpressionSpecification = [
+  "interpolate", ["linear"], ["zoom"], 10, 2, 15, 5,
+];
+// Connected sinks grow slightly so they read as picked out, not just brighter.
+const SINK_RADIUS_SELECTED: ExpressionSpecification = [
+  "interpolate", ["linear"], ["zoom"], 10, 3.5, 15, 7,
+];
 
 const CENTERS: Record<string, [number, number]> = {
   nyc: [-73.98, 40.73],
@@ -22,7 +35,7 @@ const CENTERS: Record<string, [number, number]> = {
 
 /// Written out rather than spread from a table: maplibre's `match` expression
 /// is typed by arity, so a spread loses the shape it needs.
-const SINK_COLOR = [
+const SINK_COLOR: ExpressionSpecification = [
   "match",
   ["get", "cat"],
   "pool", "#00acc1",
@@ -36,7 +49,7 @@ const SINK_COLOR = [
   "school", "#c0ca33",
   "office", "#757575",
   "#9e9e9e",
-] as unknown as maplibregl.ExpressionSpecification;
+] as unknown as ExpressionSpecification;
 
 export function Map() {
   const ref = useRef<HTMLDivElement>(null);
@@ -47,10 +60,12 @@ export function Map() {
   const results = useStore((s) => s.results);
   const explain = useStore((s) => s.explain);
   const selectedDc = useStore((s) => s.selectedDc);
-  const select = useStore((s) => s.select);
+  const [styleReady, setStyleReady] = useState(false);
 
-  // Create the map once the data is in hand, so sources can be added with the
-  // style rather than patched in afterwards.
+  // Built exactly once per engine. Anything that changes as the user works —
+  // results, selection — is read from the store inside the handlers rather
+  // than closed over, because a dependency that changes on every recompute
+  // would tear the map down and rebuild it mid-load, leaving a blank canvas.
   useEffect(() => {
     if (!ref.current || map.current || !engine) return;
 
@@ -59,7 +74,7 @@ export function Map() {
       m = new MlMap({
       container: ref.current,
       style: "https://tiles.openfreemap.org/styles/liberty",
-      center: CENTERS[region] ?? CENTERS.nyc,
+      center: CENTERS[useStore.getState().region] ?? CENTERS.nyc,
         zoom: 11,
         attributionControl: false,
       });
@@ -87,14 +102,45 @@ export function Map() {
         });
       }
 
+      if (engine.geo.zones) {
+        m.addSource("zones", { type: "geojson", data: engine.geo.zones as never });
+        m.addLayer({
+          id: "zones-fill",
+          type: "fill",
+          source: "zones",
+          paint: {
+            "fill-color": ["match", ["get", "kind"], "steam", "#d98b4a", "#4ad9a0"],
+            // Kept faint: these are approximations, and should read as context
+            // rather than as surveyed boundaries.
+            "fill-opacity": 0.12,
+          },
+        });
+      }
+
+      // Reach rings for the selected site, populated on selection.
+      m.addSource("rings", { type: "geojson", data: EMPTY });
+      m.addLayer({
+        id: "rings-line",
+        type: "line",
+        source: "rings",
+        paint: {
+          "line-color": "#666",
+          "line-width": 1.2,
+          "line-dasharray": [2, 2],
+        },
+      });
+
       m.addLayer({
         id: "sinks-circle",
         type: "circle",
         source: "sinks",
         paint: {
-          "circle-radius": ["interpolate", ["linear"], ["zoom"], 10, 2, 15, 5],
+          "circle-radius": SINK_RADIUS,
           "circle-color": SINK_COLOR,
-          "circle-opacity": 0.75,
+          "circle-opacity": SINK_OPACITY,
+          "circle-stroke-width": 1,
+          "circle-stroke-color": "#ffffff",
+          "circle-stroke-opacity": 0,
         },
       });
 
@@ -127,7 +173,7 @@ export function Map() {
         const f = e.features?.[0];
         if (!f) return;
         const p = f.properties as { id: string; name: string; mw: number };
-        const match = results.find((r) => r.dc === p.id);
+        const match = useStore.getState().results.find((r) => r.dc === p.id);
         popup
           .setLngLat(e.lngLat)
           .setHTML(
@@ -142,47 +188,103 @@ export function Map() {
       });
       m.on("click", "dcs-circle", (e: MapLayerMouseEvent) => {
         const id = (e.features?.[0]?.properties as { id?: string })?.id;
-        if (id) select(id === useStore.getState().selectedDc ? null : id);
+        if (!id) return;
+        const store = useStore.getState();
+        store.select(id === store.selectedDc ? null : id);
       });
 
       map.current = m;
-      // Trigger the first paint of scores now that layers exist.
-      useStore.setState((s) => ({ ...s }));
+      // Layers exist now, so the effects that paint scores and rings can run.
+      setStyleReady(true);
     });
 
     return () => {
       m.remove();
       map.current = null;
     };
-  }, [engine, region, results, select]);
+  }, [engine]);
 
   // Push scores into feature state rather than rebuilding the source: the
   // geometry never changes, only the colour.
   useEffect(() => {
     const m = map.current;
-    if (!m || !m.isStyleLoaded()) return;
+    if (!m || !styleReady) return;
     for (const r of results) {
       m.setFeatureState(
         { source: "dcs", id: r.dc },
         { bucket: paybackBucket(r.payback_yrs), selected: r.dc === selectedDc },
       );
     }
-  }, [results, selectedDc]);
+  }, [results, selectedDc, styleReady]);
 
-  // Dim sinks that are not part of the selected site's explanation.
+  // Draw the reach rings for the selected site: the radius itself, and the
+  // straight-line distance that radius corresponds to once the detour factor
+  // is applied, which is what a reader's eye actually measures.
+  const weights = useStore((s) => s.weights);
   useEffect(() => {
     const m = map.current;
-    if (!m || !m.getLayer("sinks-circle")) return;
-    if (!selectedDc || explain.length === 0) {
-      m.setFilter("sinks-circle", null);
+    if (!m || !styleReady) return;
+    const src = m.getSource("rings") as { setData?: (d: unknown) => void } | undefined;
+    if (!src?.setData) return;
+
+    const fc = engine?.geo.datacenters as
+      | { features: { properties: { id: string }; geometry: { coordinates: [number, number] } }[] }
+      | undefined;
+    const site = fc?.features.find((f) => f.properties.id === selectedDc);
+    if (!site || !weights) return void src.setData(EMPTY);
+
+    const radiusKm = weights.radius_m / 1000;
+    const detour =
+      weights.distance.kind === "detour"
+        ? weights.distance.k
+        : weights.distance.kind === "rotated_l1"
+          ? Math.SQRT2
+          : 1;
+    src.setData({
+      type: "FeatureCollection",
+      features: [
+        circle(site.geometry.coordinates, radiusKm, { steps: 64 }),
+        circle(site.geometry.coordinates, radiusKm / detour, { steps: 64 }),
+      ],
+    });
+  }, [selectedDc, weights, engine, styleReady]);
+
+  // Fade the sinks a selected site cannot reach, rather than hiding them.
+  //
+  // Filtering them out was the first attempt and it read badly: the
+  // surroundings vanished, so there was no way to see what a site was passing
+  // up. Keeping every sink on the map, with the unreachable ones dropped to a
+  // low opacity, preserves that context while the relevant ones still stand
+  // out. Colour stays the category colour — the fade does the work, so the
+  // muted points remain identifiable rather than turning into grey dots.
+  useEffect(() => {
+    const m = map.current;
+    if (!m || !styleReady || !m.getLayer("sinks-circle")) return;
+
+    const active = selectedDc !== null && explain.length > 0;
+    if (!active) {
+      m.setPaintProperty("sinks-circle", "circle-opacity", SINK_OPACITY);
+      m.setPaintProperty("sinks-circle", "circle-radius", SINK_RADIUS);
+      m.setPaintProperty("sinks-circle", "circle-stroke-opacity", 0);
       return;
     }
-    m.setFilter("sinks-circle", [
+
+    const inExplain: ExpressionSpecification = [
       "in",
       ["get", "id"],
       ["literal", explain.map((c) => c.sink)],
+    ];
+    m.setPaintProperty("sinks-circle", "circle-opacity", [
+      "case", inExplain, 0.95, 0.18,
     ]);
-  }, [selectedDc, explain]);
+    m.setPaintProperty("sinks-circle", "circle-radius", [
+      "case", inExplain, SINK_RADIUS_SELECTED, SINK_RADIUS,
+    ]);
+    // A thin halo lifts the connected sinks off a busy basemap.
+    m.setPaintProperty("sinks-circle", "circle-stroke-opacity", [
+      "case", inExplain, 0.9, 0,
+    ]);
+  }, [selectedDc, explain, styleReady]);
 
   // Recentre when the region changes.
   useEffect(() => {
