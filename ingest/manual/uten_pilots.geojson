@@ -1,0 +1,5 @@
+{
+ "type": "FeatureCollection",
+ "features": [],
+ "_comment": "Utility thermal energy network pilot footprints. Empty until the NYSERDA/utility pilot boundaries are published as geodata. TODO: add them here; every data center and sink is tagged in_uten by point-in-polygon against this file."
+}

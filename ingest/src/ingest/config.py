@@ -72,6 +72,75 @@ NYS_BOUNDARY_SOURCE = {
     "note": "US Census Bureau TIGER/Line 2024 state boundaries.",
 }
 
+# --- NYC Open Data (Socrata) ----------------------------------------------
+# Queried through the API with server-side filters rather than downloading the
+# full MapPLUTO shapefile, which is hundreds of megabytes of geometry this
+# pipeline never uses: PLUTO already carries a lot centroid.
+PLUTO_DATASET = "64uk-42ks"
+PLUTO_URL = f"https://data.cityofnewyork.us/resource/{PLUTO_DATASET}.json"
+PLUTO_SOURCE = {
+    "id": "nyc_pluto",
+    "url": f"https://data.cityofnewyork.us/d/{PLUTO_DATASET}",
+    "license": "public-domain",
+    "note": "NYC Department of City Planning, Primary Land Use Tax Lot Output.",
+}
+
+LL84_DATASET = "7x5e-2fxh"
+LL84_URL = f"https://data.cityofnewyork.us/resource/{LL84_DATASET}.json"
+LL84_SOURCE = {
+    "id": "nyc_ll84",
+    "url": f"https://data.cityofnewyork.us/d/{LL84_DATASET}",
+    "license": "public-domain",
+    "note": "Energy and Water Data Disclosure for Local Law 84, calendar year 2021.",
+}
+
+# Building classes that could plausibly house a data center: E/F industrial and
+# warehouse, I utility, Y public facility (§3.3).
+PLUTO_BLDG_CLASS_PREFIXES = ("E", "F", "I", "Y")
+
+# Owner-name fragments for known colocation and carrier operators. Matched
+# case-insensitively as substrings; deliberately broad, then narrowed by the
+# building-class and address filters.
+# "COLO" alone was tried and removed: it matches Colonna, Colossal and similar
+# ordinary owner names. Only whole words or distinctive brands belong here.
+DC_OPERATOR_NAMES = (
+    "EQUINIX", "DIGITAL REALTY", "TELX", "TELEHOUSE", "SABEY", "CORESITE",
+    "DATABANK", "CYXTERA", "ZAYO", "VERIZON", "AT&T", "DATA CENTER",
+    "COLOCATION", "INTERNAP", "CENTURYLINK", "LUMEN", "IRON MOUNTAIN",
+)
+
+# Carrier hotels, which are ordinary office building classes and so would be
+# missed by the class filter. 165 Halsey St is deliberately absent: it is in
+# Newark, New Jersey.
+# Addresses are PLUTO's spelling, which is not always the one on the door:
+# 60 Hudson Street is filed as "56 HUDSON STREET". Verified against the table
+# rather than assumed.
+CARRIER_HOTEL_ADDRESSES = (
+    "56 HUDSON STREET",  # 60 Hudson Street, the Western Union building
+    "111 8 AVENUE",
+    "32 AVENUE OF THE AMERICAS",
+    "375 PEARL STREET",
+    "325 HUDSON STREET",
+    "85 10 AVENUE",
+    "121 VARICK STREET",
+    "33 WHITEHALL STREET",
+)
+
+# Ceiling on an area-derived capacity estimate, MW.
+#
+# The 75 W/sq ft figure assumes a whole building is white space, which is false
+# for the mixed-use towers this catches: 111 8th Avenue came out at 162 MW, far
+# more than any facility in the state and enough to dominate every ranking on
+# its own. Capping keeps a plausibly-large site large without letting a
+# floor-area artefact outrank real measurements. Flagged in the README.
+MAX_ESTIMATED_DC_MW = 25.0
+
+# kBtu -> kWh.
+KBTU_TO_KWH = 0.293071
+
+# A sink is matched to a tax lot within this distance of its centroid (§3.3).
+LL84_JOIN_M = 40.0
+
 OVERPASS_URL = "https://overpass-api.de/api/interpreter"
 OVERPASS_TIMEOUT_S = 180
 OVERPASS_MAX_RETRIES = 4

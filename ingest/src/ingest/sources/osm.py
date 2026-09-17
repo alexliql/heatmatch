@@ -5,16 +5,15 @@ the service returns 406 for a default requests/curl User-Agent, and `out geom`
 is required rather than `out center` because the area gates and the footprint
 demand estimate both need the polygon, not just its centre.
 
-Queries cover a whole region bbox, which is wasteful: the NYC run fetches ~4400
-sinks and the pre-filter in merge/sinks.py keeps ~160 of them. That is tolerable
-for nyc (~10 minutes, cached afterwards) but will not scale to the upstate bbox,
-which is the rest of the state. Before upstate is enabled, switch to anchoring
-each query on the data centers with Overpass `(around:R,lat,lon)` clauses, using
-the same radius the pre-filter already applies.
+Queries are anchored on the data centers rather than on the region bbox. A bbox
+query over NYC returned ~4400 sinks of which the pre-filter kept ~160, and the
+same query over upstate — the rest of the state — did not return at all.
+Overpass takes a list of coordinates in one `around` clause, so the whole
+region costs one query per category regardless of how many sites it has.
 """
 
 import json
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 
 from pyproj import Geod
 from shapely.geometry import Polygon
@@ -30,7 +29,6 @@ from ingest.config import (
     OVERPASS_SOURCE,
     OVERPASS_TIMEOUT_S,
     OVERPASS_URL,
-    REGIONS,
     RegionName,
     SinkCat,
     region_for,
@@ -46,18 +44,21 @@ _GEOD = Geod(ellps="WGS84")
 _DEDUPE_M = 50.0
 
 
-def _query(cat: SinkCat, bbox: tuple[float, float, float, float]) -> str:
-    """Build Overpass QL. Note Overpass orders bbox as (S,W,N,E).
+def _query(cat: SinkCat, anchors: Sequence[tuple[float, float]], radius_m: float) -> str:
+    """Build Overpass QL anchored on the data centers.
+
+    `around` accepts a flat list of lat,lon pairs, so one clause covers every
+    site in the region.
 
     Area-gated categories skip nodes entirely. A node has no footprint and so
     can never clear its gate, and for a selector as broad as `["office"]` the
     discarded nodes dominate the response — querying them turns a fast request
     into one that does not return.
     """
-    min_lon, min_lat, max_lon, max_lat = bbox
-    box = f"({min_lat},{min_lon},{max_lat},{max_lon})"
+    coords = ",".join(f"{lat:.6f},{lon:.6f}" for lat, lon in anchors)
+    around = f"(around:{radius_m:.0f},{coords})"
     kinds = ("way", "relation") if cat in MIN_AREA_M2 else ("node", "way", "relation")
-    parts = [f"{kind}{sel}{box};" for sel in OVERPASS_FILTERS[cat] for kind in kinds]
+    parts = [f"{kind}{sel}{around};" for sel in OVERPASS_FILTERS[cat] for kind in kinds]
     return f"[out:json][timeout:{OVERPASS_TIMEOUT_S}];(" + "".join(parts) + ");out geom tags;"
 
 
@@ -137,9 +138,16 @@ def _dedupe(rows: list[dict]) -> list[dict]:
     return kept
 
 
-def candidates(region: RegionName, *, refresh: bool = False) -> Iterator[dict]:
-    """Yield raw sink candidates for `region`, one Overpass query per category."""
-    bbox = REGIONS[region]["bbox"]
+def candidates(
+    region: RegionName,
+    anchors: Sequence[tuple[float, float]],
+    radius_m: float,
+    *,
+    refresh: bool = False,
+) -> Iterator[dict]:
+    """Yield raw sink candidates near `anchors`, one Overpass query per category."""
+    if not anchors:
+        return
     rows: list[dict] = []
 
     for cat in OVERPASS_FILTERS:
@@ -147,7 +155,7 @@ def candidates(region: RegionName, *, refresh: bool = False) -> Iterator[dict]:
             continue
         body = cached_post(
             OVERPASS_URL,
-            {"data": _query(cat, bbox)},
+            {"data": _query(cat, anchors, radius_m)},
             subdir=f"osm/{region}",
             max_retries=OVERPASS_MAX_RETRIES,
             refresh=refresh,

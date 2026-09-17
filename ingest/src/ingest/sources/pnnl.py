@@ -15,6 +15,7 @@ from ingest.config import (
     ATLAS_SOURCE,
     ATLAS_URL,
     DEFAULT_DC_MW,
+    MAX_ESTIMATED_DC_MW,
     MW_PER_SQFT,
     RegionName,
     region_for,
@@ -54,7 +55,8 @@ def candidates(region: RegionName, *, refresh: bool = False) -> Iterator[dict]:
 
         sqft = props.get("sqft")
         if sqft and float(sqft) > 0:
-            mw, mw_source = float(sqft) * MW_PER_SQFT, "atlas_sqft"
+            mw = min(float(sqft) * MW_PER_SQFT, MAX_ESTIMATED_DC_MW)
+            mw_source = "atlas_sqft"
         else:
             mw, mw_source = DEFAULT_DC_MW, "atlas_default"
 

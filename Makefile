@@ -7,7 +7,7 @@ help:
 	@grep -E '^[a-z-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
 
 ingest:  ## Rebuild data/ from upstream sources (hits the network)
-	cd ingest && uv run ingest run --region all
+	cd ingest && PYTHONPATH=src uv run python -m ingest run --region all
 
 core-test:  ## cargo fmt check + clippy + tests for the Rust workspace
 	cd core && cargo fmt --all -- --check

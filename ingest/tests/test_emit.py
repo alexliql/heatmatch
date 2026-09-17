@@ -48,12 +48,18 @@ def test_ids_are_assigned_by_position_not_source_order(monkeypatch) -> None:
         {"name": "A", "region": "nyc", "lat": 40.7, "lon": -74.0, "mw": 2.0,
          "mw_source": "atlas_default", "cooling": "unknown", "sources": ["t"]},
     ]
-    from ingest.sources import pnnl
+    from ingest.sources import nys_parcels, pluto, pnnl
+
+    def none(region, refresh=False):
+        return iter(())
+
+    monkeypatch.setattr(pluto, "candidates", none)
+    monkeypatch.setattr(nys_parcels, "candidates", none)
 
     monkeypatch.setattr(pnnl, "candidates", lambda region, refresh=False: iter(rows))
     forward = {d.id: d.name for d in build_dcs(["nyc"])}
 
-    monkeypatch.setattr(pnnl, "candidates", lambda region, refresh=False: iter(rows[::-1]))
+    monkeypatch.setattr(pnnl, "candidates", lambda region, refresh=False: iter(list(rows[::-1])))
     reversed_ = {d.id: d.name for d in build_dcs(["nyc"])}
 
     assert forward == reversed_ == {"dc_0000": "A", "dc_0001": "B"}

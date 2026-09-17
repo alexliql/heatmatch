@@ -1,0 +1,4 @@
+id_or_name,cooling
+# Manual cooling-type overrides. No public source records cooling
+# type, so every site defaults to "unknown" (35 C supply) without an entry here.
+# Valid values: air, rear_door, liquid

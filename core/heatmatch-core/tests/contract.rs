@@ -114,22 +114,36 @@ fn engine_ranks_the_committed_dataset() {
         .map(|f| serde_json::from_value(Value::Object(flatten(f))).unwrap())
         .collect();
 
-    let expected = dcs.len();
-    let engine = Engine::new(dcs, sinks, &[]).expect("engine build");
-    let ranked = engine
-        .rank(
-            Region::Nyc,
-            &Weights::default_for(Region::Nyc),
-            &Econ::default_for(Region::Nyc),
-        )
-        .unwrap();
+    // Counted per region: `rank` covers one region at a time, and the dataset
+    // now spans both.
+    let expected: Vec<(Region, usize)> = Region::ALL
+        .iter()
+        .map(|r| (*r, dcs.iter().filter(|d| d.region == *r).count()))
+        .collect();
 
-    assert_eq!(ranked.len(), expected);
-    assert!(
-        ranked.windows(2).all(|p| p[0].score >= p[1].score),
-        "not sorted by score"
-    );
-    // The whole point of the dataset is that some site scores; an all-zero
-    // ranking would mean the radius or the projection is wrong.
-    assert!(ranked[0].score > 0.0, "top data center scored zero");
+    let engine = Engine::new(dcs, sinks, &[]).expect("engine build");
+
+    for (region, count) in expected {
+        let ranked = engine
+            .rank(
+                region,
+                &Weights::default_for(region),
+                &Econ::default_for(region),
+            )
+            .unwrap();
+
+        assert_eq!(ranked.len(), count, "{region:?} data center count");
+        assert!(
+            ranked.windows(2).all(|p| p[0].score >= p[1].score),
+            "{region:?} not sorted by score"
+        );
+        // The whole point of the dataset is that some site scores; an all-zero
+        // ranking would mean the radius or the projection is wrong.
+        if count > 0 {
+            assert!(
+                ranked[0].score > 0.0,
+                "{region:?} top data center scored zero"
+            );
+        }
+    }
 }

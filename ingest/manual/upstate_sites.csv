@@ -1,0 +1,5 @@
+name,lat,lon,mw,cooling,note
+# Curated upstate data center sites, for facilities the IM3 Atlas does not list.
+# mw is a published or widely-reported IT load where available. Add rows here
+# rather than in code; every entry is emitted with mw_source="manual".
+Yahoo Lockport Data Center,43.1706,-78.6903,15.0,air,Reported ~15 MW IT load; well-known free-cooling site

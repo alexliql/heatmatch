@@ -1,14 +1,14 @@
 {
-  "built_at": "2026-09-16T19:33:17+00:00",
+  "built_at": "2026-09-16T21:51:50+00:00",
   "datacenters": {
-    "count": 6,
-    "file": "datacenters.cb321a0f.geojson",
-    "hash": "cb321a0fd56f64599bee7ba4c17706ba7b43303bd6907a338efb59b9927fef2e"
+    "count": 29,
+    "file": "datacenters.5a053a99.geojson",
+    "hash": "5a053a991aa143213d20a3bcc7c955426ed751893b2aea0ba25e584095cfc2b4"
   },
   "sinks": {
-    "count": 157,
-    "file": "sinks.78b6e6cb.geojson",
-    "hash": "78b6e6cbb8032032901f203566a6c9da0f639bfced849475ef403bb64b20806b"
+    "count": 872,
+    "file": "sinks.eb717d02.geojson",
+    "hash": "eb717d02176fd26a083845286b619a9c67a1f0a71f28a8eaadae82d3679652e7"
   },
   "sources": [
     {
@@ -28,6 +28,34 @@
       "license": "public-domain",
       "note": "US Census Bureau TIGER/Line 2024 state boundaries.",
       "url": "https://www2.census.gov/geo/tiger/TIGER2024/STATE/tl_2024_us_state.zip"
+    },
+    {
+      "id": "nyc_pluto",
+      "license": "public-domain",
+      "note": "NYC Department of City Planning, Primary Land Use Tax Lot Output.",
+      "url": "https://data.cityofnewyork.us/d/64uk-42ks"
+    },
+    {
+      "id": "nyc_ll84",
+      "license": "public-domain",
+      "note": "Energy and Water Data Disclosure for Local Law 84, calendar year 2021.",
+      "url": "https://data.cityofnewyork.us/d/7x5e-2fxh"
+    },
+    {
+      "id": "manual_upstate",
+      "license": "CC0-1.0",
+      "note": "Hand-curated upstate data center sites; see the file for per-row provenance.",
+      "url": "https://github.com/alexliql/heatmatch/blob/main/ingest/manual/upstate_sites.csv"
     }
-  ]
+  ],
+  "water": {
+    "count": 24,
+    "file": "water.c7c5376b.geojson",
+    "hash": "c7c5376b4b956c376c195bd4d8f672c31603bdc87679340540a74b77640dcbc6"
+  },
+  "zones": {
+    "count": 1,
+    "file": "zones.943d5511.geojson",
+    "hash": "943d551110de0095e6422d4cbb8ff66aa5c40974f1b649c9ff61ef00411b5b2b"
+  }
 }

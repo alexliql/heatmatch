@@ -5,6 +5,8 @@ import pytest
 from ingest.config import MIN_AREA_M2
 from ingest.sources.osm import _dedupe, _footprint, _query
 
+ANCHORS = [(40.7128, -74.0060), (40.75, -73.99)]
+
 # A ~100 m square near Times Square, as Overpass returns it under `out geom`.
 _SQUARE = [
     {"lat": 40.7580, "lon": -73.9855},
@@ -18,24 +20,32 @@ _SQUARE = [
 def test_query_uses_out_geom_not_out_center() -> None:
     # `out center` omits the polygon, and without it neither the area gates nor
     # the footprint demand estimate can be computed.
-    assert "out geom tags;" in _query("hospital", (-74.3, 40.45, -73.65, 40.95))
+    assert "out geom tags;" in _query("hospital", ANCHORS, 1430.0)
 
 
-def test_query_orders_bbox_south_west_north_east() -> None:
-    # Overpass takes (S,W,N,E) while config stores (min_lon,min_lat,max_lon,max_lat);
-    # swapping them silently queries the wrong part of the planet.
-    assert "(40.45,-74.3,40.95,-73.65)" in _query("hospital", (-74.3, 40.45, -73.65, 40.95))
+def test_query_is_anchored_on_the_data_centers() -> None:
+    # One `around` clause carries every site, so a region costs one query per
+    # category however many data centers it has.
+    q = _query("hospital", ANCHORS, 1430.0)
+    assert "(around:1430,40.712800,-74.006000,40.750000,-73.990000)" in q
+    assert q.count("around:") == 3  # node, way, relation — one selector
+
+
+def test_query_with_no_anchors_is_not_sent() -> None:
+    from ingest.sources.osm import candidates
+
+    assert list(candidates("upstate", [], 1000.0)) == []
 
 
 @pytest.mark.parametrize("cat", sorted(MIN_AREA_M2))
 def test_gated_categories_do_not_query_nodes(cat: str) -> None:
     # A node has no footprint and can never clear an area gate; for a selector
     # as broad as ["office"] the wasted nodes make the request time out.
-    assert "node[" not in _query(cat, (-74.3, 40.45, -73.65, 40.95))
+    assert "node[" not in _query(cat, ANCHORS, 1430.0)
 
 
 def test_ungated_categories_still_query_nodes() -> None:
-    assert "node[" in _query("hospital", (-74.3, 40.45, -73.65, 40.95))
+    assert "node[" in _query("hospital", ANCHORS, 1430.0)
 
 
 def test_way_footprint_area_and_centroid() -> None:
