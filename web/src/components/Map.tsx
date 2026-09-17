@@ -123,14 +123,19 @@ export function Map() {
       if (engine.geo.zones) {
         m.addSource("zones", { type: "geojson", data: engine.geo.zones as never });
         m.addLayer({
-          id: "zones-fill",
-          type: "fill",
+          id: "zones-line",
+          type: "line",
           source: "zones",
           paint: {
-            "fill-color": ["match", ["get", "kind"], "steam", "#d98b4a", "#4ad9a0"],
-            // Kept faint: these are approximations, and should read as context
-            // rather than as surveyed boundaries.
-            "fill-opacity": 0.18,
+            "line-color": ["match", ["get", "kind"], "steam", "#d98b4a", "#4ad9a0"],
+            // An outline, not a fill. A tinted polygon over lower Manhattan
+            // washed the whole area and read as a filter applied to the data,
+            // which is exactly the wrong impression: the boundary is
+            // hand-drawn and approximate, so it should mark an edge rather
+            // than colour everything inside it.
+            "line-width": 1,
+            "line-opacity": 0.55,
+            "line-dasharray": [3, 3],
           },
         });
       }
