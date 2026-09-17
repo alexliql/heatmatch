@@ -20,7 +20,7 @@ from ingest.config import (
     RegionName,
     region_for,
 )
-from ingest.sources.boundary import in_nys
+from ingest.sources.boundary import in_region_boundary
 from ingest.sources.fetch import cached_get
 
 _FIELDS = "bbl,address,ownername,bldgclass,bldgarea,numfloors,latitude,longitude"
@@ -80,7 +80,7 @@ def candidates(region: RegionName, *, refresh: bool = False) -> Iterator[dict]:
             lat, lon = float(row["latitude"]), float(row["longitude"])
         except (KeyError, TypeError, ValueError):
             continue
-        if region_for(lat, lon) != "nyc" or not in_nys(lat, lon):
+        if region_for(lat, lon) != "nyc" or not in_region_boundary(lat, lon, "nyc"):
             continue
 
         area = float(row.get("bldgarea") or 0)
@@ -99,7 +99,8 @@ def candidates(region: RegionName, *, refresh: bool = False) -> Iterator[dict]:
             "region": "nyc",
             "lat": lat,
             "lon": lon,
-            "mw": min(area * MW_PER_SQFT, MAX_ESTIMATED_DC_MW),
+            # NYC-only source, so the nyc ceiling is the right one.
+            "mw": min(area * MW_PER_SQFT, MAX_ESTIMATED_DC_MW["nyc"]),
             "mw_source": "pluto_estimate",
             "cooling": "unknown",
             "sources": [PLUTO_SOURCE["id"]],

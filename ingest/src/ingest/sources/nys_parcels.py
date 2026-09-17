@@ -15,7 +15,7 @@ from collections.abc import Iterator
 from pathlib import Path
 
 from ingest.config import RegionName, region_for
-from ingest.sources.boundary import in_nys
+from ingest.sources.boundary import in_region_boundary
 
 MANUAL = Path(__file__).resolve().parents[3] / "manual"
 PARCELS_SOURCE = {
@@ -43,7 +43,7 @@ def candidates(region: RegionName, *, refresh: bool = False) -> Iterator[dict]:
             lat, lon, mw = float(row["lat"]), float(row["lon"]), float(row["mw"])
         except (KeyError, ValueError):
             continue
-        if mw <= 0 or region_for(lat, lon) != "upstate" or not in_nys(lat, lon):
+        if mw <= 0 or region_for(lat, lon) != "upstate" or not in_region_boundary(lat, lon, "upstate"):
             continue
 
         yield {

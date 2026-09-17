@@ -1,8 +1,11 @@
 # heatmatch
 
-Ranks New York State data centers by how well their waste heat could be reused
-by nearby heat consumers — pools, hospitals, greenhouses, wastewater plants and
-so on.
+Ranks data centers by how well their waste heat could be reused by nearby heat
+consumers — pools, hospitals, greenhouses, wastewater plants and so on.
+
+Three regions: **New York City**, **Upstate New York**, and **Northern
+Virginia** — Loudoun, Prince William, Fairfax, Arlington, Alexandria, Manassas
+and Manassas Park, the largest data center cluster in the world.
 
 The whole thing is a static site. Data is prepared offline by a Python pipeline
 and committed as GeoJSON; the scoring engine is Rust compiled to WebAssembly and
@@ -116,6 +119,103 @@ came out at 162 MW, more than any facility in the state, purely as an artefact
 of a large mixed-use tower. Estimated capacities are flagged in the data as
 `mw_source`.
 
+## Virginia: methods and limitations
+
+Northern Virginia is the reason two things in this project exist that New York
+did not need. Both are consequences of one fact: **Virginia has no building
+energy benchmarking disclosure.** There is no Local Law 84 equivalent, so no
+Virginia building in this dataset has a measured heating demand.
+
+### All Virginia demand is modelled, not measured
+
+Annual heating demand comes from [NREL
+ComStock](https://registry.opendata.aws/nrel-pds-building-stock/), release
+`2025/comstock_amy2018_release_3`, pinned in `config.py` so a re-run cannot
+silently change every figure. For each ComStock building type, sampled across
+the seven jurisdictions, the pipeline computes heating-fuel use per square
+metre of floor area, then multiplies by each sink's footprint. Monthly shapes
+come from the same release's state-level timeseries aggregates.
+
+Sinks carry `demand_source: "comstock_modeled"` to say so. **A ComStock
+intensity describes a typical building of its type in climate zone 4A — not the
+specific building on the map.**
+
+Three things this gets wrong, in decreasing order of how much they matter:
+
+- **Electrically heated buildings read as having almost no demand.** The
+  intensities count gas, oil and propane only, matching how New York's LL84
+  figures are treated and how the economics price a displaced gas boiler. But
+  Virginia's mild climate means much of the commercial stock runs heat pumps:
+  only **36% of large offices burn any fuel at all**, which drags the
+  fuel-only large-office intensity to 10 kWh/m² against 24 kWh/m² including
+  electric heat. Those buildings still have thermal demand a heat network could
+  serve. This model does not count it, so Virginia office demand is understated.
+  Every intensity in `ingest/derived/va_intensity.json` carries a
+  `fuel_heated_share` and a `kwh_per_m2_incl_electric` so the size of the gap is
+  visible rather than buried here.
+- **Hospitals get no ComStock intensity at all.** ComStock samples only six
+  hospitals across the seven jurisdictions, below the 30-sample floor the
+  pipeline requires before publishing a number. Virginia hospitals therefore
+  fall back to the same category constant New York uses.
+- **The weather is one particular year.** `amy2018` is an *actual*
+  meteorological year, so the monthly shapes reflect 2018's weather rather than
+  a typical year. February 2018 was mild in Virginia and March was cold, which
+  is why the shapes show less February heating than March.
+
+### Capacity is graded, not assumed
+
+Virginia capacities range from figures an operator publishes to a guess from a
+building's footprint, and the model should not treat those alike. Every data
+center carries `mw_confidence`:
+
+| Grade | Meaning | Ranking multiplier |
+|---|---|---|
+| `reported` | The operator states it | 1.0 |
+| `filed` | A county approval or utility filing states it | 0.95 |
+| `parcel_estimate` | Derived from assessed building area | 0.7 |
+| `footprint_estimate` | Derived from a building footprint | 0.5 |
+
+The multiplier applies **to the ranking score only**. `supply_mwh`,
+`delivered_mwh`, `capex`, `annual_savings` and `payback_yrs` are always reported
+undiscounted — a shaky capacity figure should make a site rank lower, not make
+its pipes cheaper. New York's defaults are 1.0 across the board, because every
+New York capacity is area-derived and grading guesses against guesses is noise.
+
+On the map and in the ranking, a solid disc is a stated capacity and an outline
+is one inferred from a building.
+
+Curated figures live in `ingest/manual/nova_mw.csv`, one row per campus or
+building, each with a source URL. Because operators publish campus totals
+rather than per-building numbers, a campus row is split across its buildings
+pro rata by footprint. **Rows whose note still begins `UNVERIFIED` were seeded
+by an automated research pass: their value is used but their confidence is
+not — they are emitted as `parcel_estimate` until a person reads the source and
+removes the marker.** At present every seeded row is unverified, so the summary
+correctly reports 0% of Virginia capacity as stated.
+
+### Other Virginia-specific caveats
+
+- **Cooling type is unknown for effectively every site**, and most Northern
+  Virginia capacity is air-cooled, so institutional sinks need heat pumps. The
+  model says so, via the COP column in the detail view.
+- **Neighbouring data centers compete for the same sinks.** Each site's supply
+  is allocated independently, so in Ashburn the same pool can be counted as
+  served by several neighbours at once. The detail view flags sinks claimed by
+  more than one top-20 site as "also claimed nearby"; nothing resolves the
+  conflict.
+- **Curated capacity is approved or planned capacity**, which can exceed what is
+  installed and energised today.
+- **The City of Fairfax is excluded.** It is an independent city, not one of the
+  seven jurisdictions, so it appears as a hole inside Fairfax County.
+- **Back-garden pools are filtered out of Virginia only.** OpenStreetMap
+  coverage of suburban Virginia includes domestic pools: 544 of 588 matches were
+  unnamed with a median area of 81 m², against ~330 m² for the smallest named
+  community pool. Since `pool` carries the highest category weight, they would
+  otherwise decide the ranking. Virginia gates pools at 250 m².
+  **New York has the same problem and is deliberately left ungated** — 76% of
+  NYC pool matches are under 250 m², median 21 m² — because fixing it would move
+  already-published New York results. See the note in `config.py`.
+
 ## Known limitations
 
 These are deliberate simplifications, not bugs:
@@ -127,7 +227,8 @@ These are deliberate simplifications, not bugs:
 - MW capacity is estimated from building area for most sites.
 - Cooling type — which sets the waste-heat supply temperature — is unknown for
   nearly all sites and defaults to air-cooled.
-- LL84 energy disclosure covers only NYC buildings ≥ 25,000 sq ft.
+- LL84 energy disclosure covers only NYC buildings ≥ 25,000 sq ft. Virginia has
+  no equivalent at all; see "Virginia: methods and limitations".
 - OSM sink coverage is uneven, especially upstate.
 - Steam-territory and thermal-network polygons are hand-drawn approximations.
 - Temperatures come from a fixed per-category lookup; there is no real
@@ -141,9 +242,14 @@ These are deliberate simplifications, not bugs:
   self-consistent.
 - Heat-pump capacity is sized from average load, not winter peak, so it is
   undersized for the coldest months.
-- Capacity estimates derived from floor area are capped at 25 MW; see
-  Methodology. Without the cap a single mixed-use tower outranks every real
-  facility in the state.
+- Capacity estimates derived from floor area are capped per region — 25 MW in
+  New York, 150 MW in Virginia. Without the New York cap a single mixed-use
+  tower outranks every real facility in the state; a cap that low in Virginia
+  would clip most of the Ashburn cluster to the same value and flatten the
+  ranking it exists to produce.
+- Feature ids carry their region (`dc_nova_0007`), so adding a region does not
+  renumber the ones already published. Ids are otherwise assigned by position
+  and are not stable across a change to the underlying source data.
 - NYC data center coverage is **not exhaustive**. It combines an
   OpenStreetMap-derived atlas with a tax-lot filter, and both miss sites that
   are not tagged or not owned under a recognisable name.

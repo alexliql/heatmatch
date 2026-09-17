@@ -28,7 +28,7 @@ import {
 } from "@/lib/format";
 import { SHEET_SNAPS, resolvedTheme, useStore } from "@/lib/store";
 import { isCoarsePointer, layoutMode } from "@/lib/useMedia";
-import { CAT_LABELS, type SinkCat } from "@/lib/types";
+import { CAT_LABELS, type RegionView, type SinkCat } from "@/lib/types";
 
 import "maplibre-gl/dist/maplibre-gl.css";
 
@@ -132,11 +132,19 @@ function chromePadding(): PaddingOptions {
     : { top: 72, left: 40, right: w + 48, bottom: 48 };
 }
 
-function dcBounds(engine: Engine): LngLatBoundsLike | null {
+function dcBounds(engine: Engine, region: RegionView = "all"): LngLatBoundsLike | null {
   const fc = engine.geo.datacenters as
-    | { features: { geometry: { coordinates: [number, number] } }[] }
+    | {
+        features: {
+          properties: { region: string };
+          geometry: { coordinates: [number, number] };
+        }[];
+      }
     | undefined;
-  const coords = fc?.features.map((f) => f.geometry.coordinates) ?? [];
+  const features = (fc?.features ?? []).filter(
+    (f) => region === "all" || f.properties.region === region,
+  );
+  const coords = features.map((f) => f.geometry.coordinates);
   if (coords.length === 0) return null;
   const lons = coords.map((c) => c[0]);
   const lats = coords.map((c) => c[1]);
@@ -309,23 +317,50 @@ function buildLayers(m: MlMap, engine: Engine, pal: Palette) {
     },
   });
 
+  // Payback bucket gives the colour; how well established the site's capacity
+  // is gives the fill. A stated capacity reads as a solid disc, a parcel
+  // estimate as a part-filled one, a footprint guess as an outline — so a
+  // glance at the map distinguishes "this site is 90 MW" from "this building
+  // is about the right size to be 90 MW".
+  //
+  // Encoded as fill rather than as a dashed outline because MapLibre circle
+  // layers have no dashed stroke: `circle-stroke-*` is solid only, and dashes
+  // exist on line layers alone.
+  const bucketColor: ExpressionSpecification = [
+    "match",
+    ["feature-state", "bucket"],
+    "fast", pal.bucket.fast,
+    "medium", pal.bucket.medium,
+    "slow", pal.bucket.slow,
+    pal.bucket.none,
+  ];
+  const stated: ExpressionSpecification = [
+    "match", ["get", "mw_confidence"], ["reported", "filed"], true, false,
+  ];
+  const weakest: ExpressionSpecification = [
+    "==", ["get", "mw_confidence"], "footprint_estimate",
+  ];
+  // Two opacity ramps rather than a multiplier: expressions cannot clamp, and
+  // an outline still has to lift on hover without becoming a solid disc.
+  const fill = (base: number, mid: number, weak: number): ExpressionSpecification => [
+    "case", stated, base, weakest, weak, mid,
+  ];
+
   m.addLayer({
     id: "dcs-circle",
     type: "circle",
     source: "dcs",
     paint: {
       "circle-radius": radius,
-      "circle-color": [
-        "match",
-        ["feature-state", "bucket"],
-        "fast", pal.bucket.fast,
-        "medium", pal.bucket.medium,
-        "slow", pal.bucket.slow,
-        pal.bucket.none,
+      "circle-color": bucketColor,
+      // The ring carries the colour when the fill is too faint to.
+      "circle-stroke-width": ["case", selected, 2, stated, 0, 1.5],
+      "circle-stroke-color": ["case", selected, pal.accent, bucketColor],
+      "circle-opacity": [
+        "case",
+        ["any", selected, hovered], fill(1, 0.7, 0.35),
+        fill(0.9, 0.45, 0.15),
       ],
-      "circle-stroke-width": ["case", selected, 2, 0],
-      "circle-stroke-color": pal.accent,
-      "circle-opacity": ["case", ["any", selected, hovered], 1, 0.9],
     },
   }, under);
 
@@ -362,6 +397,7 @@ export function Map() {
   const hoveredDc = useStore((s) => s.hoveredDc);
   const hoveredSink = useStore((s) => s.hoveredSink);
   const theme = useStore((s) => s.theme);
+  const viewRegion = useStore((s) => s.viewRegion);
   const weights = useStore((s) => s.weights);
 
   // Bumped every time the layers are (re)built; effects that paint state
@@ -528,17 +564,25 @@ export function Map() {
     return () => mq.removeEventListener("change", apply);
   }, [theme]);
 
-  // Frame every data center once the layers exist. New York State does not
-  // fit in one sensible default view, so this is a fit, not a centre.
-  const framed = useRef(false);
+  // Frame the data centers in view once the layers exist. Neither New York
+  // State nor the two states together fit in one sensible default view, so
+  // this is a fit, not a centre — and it re-fits when the region changes,
+  // because "All" spans from Buffalo to Manassas and nothing is legible at
+  // that zoom.
+  const framed = useRef<RegionView | null>(null);
   useEffect(() => {
     const m = map.current;
-    if (!m || !gen || !engine || framed.current) return;
-    const b = dcBounds(engine);
+    if (!m || !gen || !engine || framed.current === viewRegion) return;
+    const b = dcBounds(engine, viewRegion);
     if (!b) return;
-    framed.current = true;
-    m.fitBounds(b, { padding: chromePadding(), duration: 0, maxZoom: 11 });
-  }, [engine, gen]);
+    const first = framed.current === null;
+    framed.current = viewRegion;
+    m.fitBounds(b, {
+      padding: chromePadding(),
+      duration: first ? 0 : 700,
+      maxZoom: 11,
+    });
+  }, [engine, gen, viewRegion]);
 
   // Push scores into feature state rather than rebuilding the source: the
   // geometry never changes, only the colour.
@@ -597,7 +641,7 @@ export function Map() {
 
     if (!selectedDc) {
       if (was) {
-        const b = dcBounds(engine);
+        const b = dcBounds(engine, useStore.getState().viewRegion);
         if (b) m.fitBounds(b, { padding: chromePadding(), duration: 900, maxZoom: 11 });
       }
       return;

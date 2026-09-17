@@ -19,6 +19,15 @@ export function Legend() {
   const results = useStore((s) => s.results);
   const weights = useStore((s) => s.weights);
   const hasZones = useStore((s) => Boolean(s.engine?.geo.zones));
+  // True once any site carries a stated capacity, which is what makes the
+  // solid-versus-outline distinction on the map mean anything.
+  const hasEstimates = useStore((s) => {
+    const fc = s.engine?.geo.datacenters as
+      | { features: { properties: { mw_confidence?: string } }[] }
+      | undefined;
+    const grades = new Set((fc?.features ?? []).map((f) => f.properties.mw_confidence));
+    return grades.size > 1;
+  });
 
   // Open by default where there is room; folded on a phone, where it would
   // cover most of the map above the sheet.
@@ -72,6 +81,27 @@ export function Legend() {
             </div>
           </div>
 
+          {/* Only worth the space where capacities actually differ in how well
+              they are known — in New York every figure is a footprint guess. */}
+          {hasEstimates && (
+            <div>
+              <div className="legend-row">
+                <i className="dot" style={{ background: "var(--heat-medium)" }} />
+                <span>Capacity stated by the operator or a filing</span>
+              </div>
+              <div className="legend-row">
+                <i
+                  className="dot"
+                  style={{
+                    background: "transparent",
+                    boxShadow: "inset 0 0 0 1.5px var(--heat-medium)",
+                  }}
+                />
+                <span>Capacity estimated from the building</span>
+              </div>
+            </div>
+          )}
+
           <div className="legend-row">
             <i className="sq" style={{ background: "var(--sink)" }} />
             <span>Heat sinks</span>
@@ -80,7 +110,7 @@ export function Legend() {
           {hasZones && (
             <div className="legend-row">
               <i className="zone" />
-              <span>Con Ed steam territory</span>
+              <span>District heating territory</span>
             </div>
           )}
 

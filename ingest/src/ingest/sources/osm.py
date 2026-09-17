@@ -31,9 +31,10 @@ from ingest.config import (
     OVERPASS_URL,
     RegionName,
     SinkCat,
+    min_area_for,
     region_for,
 )
-from ingest.sources.boundary import in_nys
+from ingest.sources.boundary import in_region_boundary
 from ingest.sources.fetch import cached_post
 
 _GEOD = Geod(ellps="WGS84")
@@ -44,7 +45,12 @@ _GEOD = Geod(ellps="WGS84")
 _DEDUPE_M = 50.0
 
 
-def _query(cat: SinkCat, anchors: Sequence[tuple[float, float]], radius_m: float) -> str:
+def _query(
+    cat: SinkCat,
+    anchors: Sequence[tuple[float, float]],
+    radius_m: float,
+    gates: dict[SinkCat, float] | None = None,
+) -> str:
     """Build Overpass QL anchored on the data centers.
 
     `around` accepts a flat list of lat,lon pairs, so one clause covers every
@@ -54,10 +60,15 @@ def _query(cat: SinkCat, anchors: Sequence[tuple[float, float]], radius_m: float
     can never clear its gate, and for a selector as broad as `["office"]` the
     discarded nodes dominate the response — querying them turns a fast request
     into one that does not return.
+
+    `gates` is the region's area gates, which decide which categories those
+    are; it defaults to the shared table so existing callers and the tests read
+    unchanged.
     """
+    gates = gates if gates is not None else MIN_AREA_M2
     coords = ",".join(f"{lat:.6f},{lon:.6f}" for lat, lon in anchors)
     around = f"(around:{radius_m:.0f},{coords})"
-    kinds = ("way", "relation") if cat in MIN_AREA_M2 else ("node", "way", "relation")
+    kinds = ("way", "relation") if cat in gates else ("node", "way", "relation")
     parts = [f"{kind}{sel}{around};" for sel in OVERPASS_FILTERS[cat] for kind in kinds]
     return f"[out:json][timeout:{OVERPASS_TIMEOUT_S}];(" + "".join(parts) + ");out geom tags;"
 
@@ -150,12 +161,14 @@ def candidates(
         return
     rows: list[dict] = []
 
+    gates = min_area_for(region)
+
     for cat in OVERPASS_FILTERS:
         if region != "nyc" and cat in NYC_ONLY_CATS:
             continue
         body = cached_post(
             OVERPASS_URL,
-            {"data": _query(cat, anchors, radius_m)},
+            {"data": _query(cat, anchors, radius_m, gates)},
             subdir=f"osm/{region}",
             max_retries=OVERPASS_MAX_RETRIES,
             refresh=refresh,
@@ -168,10 +181,10 @@ def candidates(
 
             # A gated category is defined on footprint area, so an element with
             # no footprint (a bare node) cannot qualify.
-            gate = MIN_AREA_M2.get(cat)
+            gate = gates.get(cat)
             if gate is not None and (area_m2 is None or area_m2 < gate):
                 continue
-            if region_for(lat, lon) != region or not in_nys(lat, lon):
+            if region_for(lat, lon) != region or not in_region_boundary(lat, lon, region):
                 continue
 
             tags = el.get("tags") or {}
@@ -185,6 +198,10 @@ def candidates(
                     "cat": cat,
                     "demand_kwh": demand_kwh,
                     "demand_source": demand_source,
+                    # Carried so a region with a demand model can use it; the
+                    # footprint estimate above already has.
+                    "area_m2": area_m2,
+                    "area_source": "osm" if area_m2 else "none",
                     "steam_heated": False,  # needs LL84 (T8)
                     "sources": [OVERPASS_SOURCE["id"]],
                 }

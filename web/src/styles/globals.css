@@ -1011,3 +1011,21 @@ dialog.about::backdrop { background: rgba(0, 0, 0, 0.45); -webkit-backdrop-filte
   /* Tap toggles replace hover previews; show the hand. */
   .tbl tbody tr[data-hover], .bycat-bar > i, .bycat-list li, .season-col { cursor: pointer; }
 }
+
+/* Capacity confidence, shown the same way on the map and in the ranking:
+   a solid disc is a stated figure, a part-filled or open one is inferred. */
+.conf-mark {
+  margin-left: 0.4em;
+  opacity: 0.75;
+  font-size: 0.9em;
+  cursor: help;
+}
+
+/* Region tabs sit above the ranking tools and share the segmented style. */
+.region-tabs {
+  margin: 0 var(--s-4) var(--s-2);
+}
+.region-tabs button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}

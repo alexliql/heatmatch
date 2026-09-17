@@ -5,7 +5,8 @@ mod support;
 use approx::assert_relative_eq;
 use geo::{Coord, LineString, Polygon};
 use heatmatch_core::{
-    distance::pipe_length, season, thermo, Cooling, DistanceModel, Econ, Region, SinkCat,
+    distance::pipe_length, season, season::ProfileError, thermo, ConfidenceWeights, Cooling,
+    DataCenter, DistanceModel, Econ, Engine, MwConfidence, ProfileOverrides, Region, Sink, SinkCat,
     WaterPolicy, Weights,
 };
 
@@ -59,7 +60,8 @@ fn every_profile_sums_to_one_year() {
 fn a_flat_sink_can_absorb_a_flat_supply_entirely() {
     // A pool wants the same heat every month, so a matched flat supply is
     // fully used.
-    let (util, delivered) = season::utilization(1200.0, &[(SinkCat::Pool, 1200.0)]);
+    let (util, delivered) =
+        season::utilization(1200.0, &[(SinkCat::Pool, 1200.0)], &season::all_profiles());
     assert_relative_eq!(util, 1.0, epsilon = 1e-5);
     assert_relative_eq!(delivered, 1200.0, max_relative = 1e-5);
 }
@@ -67,13 +69,17 @@ fn a_flat_sink_can_absorb_a_flat_supply_entirely() {
 #[test]
 fn a_winter_peaked_sink_strands_summer_heat() {
     // An office wants nothing in July but the data center produces anyway.
-    let (util, _) = season::utilization(1200.0, &[(SinkCat::Office, 1200.0)]);
+    let (util, _) = season::utilization(
+        1200.0,
+        &[(SinkCat::Office, 1200.0)],
+        &season::all_profiles(),
+    );
     assert!(util < 1.0, "expected summer heat to be wasted, got {util}");
 }
 
 #[test]
 fn no_demand_means_no_delivery() {
-    let (util, delivered) = season::utilization(1000.0, &[]);
+    let (util, delivered) = season::utilization(1000.0, &[], &season::all_profiles());
     assert_eq!((util, delivered), (0.0, 0.0));
 }
 
@@ -219,4 +225,129 @@ fn water_lowers_the_score_it_does_not_raise_it() {
             x.score
         );
     }
+}
+
+// --- seasonal profile overrides -------------------------------------------
+
+/// A bundle may replace the built-in shapes for the categories it has modelled.
+#[test]
+fn an_override_replaces_only_the_categories_it_names() {
+    let mut given = std::collections::HashMap::new();
+    // Virginia's hospitals, were they perfectly flat.
+    given.insert(SinkCat::Hospital, [1.0 / 12.0; 12]);
+    let resolved = ProfileOverrides(given).resolve().expect("valid override");
+
+    assert_eq!(resolved[SinkCat::Hospital], [1.0 / 12.0; 12]);
+    // Untouched categories keep the built-in table.
+    assert_eq!(resolved[SinkCat::Office], season::profile(SinkCat::Office));
+}
+
+#[test]
+fn an_override_that_is_not_a_distribution_is_rejected() {
+    let bad = |row: [f32; 12]| {
+        let mut m = std::collections::HashMap::new();
+        m.insert(SinkCat::Pool, row);
+        ProfileOverrides(m).resolve()
+    };
+
+    // Sums to 2.0, which would hand the sink twice its annual demand.
+    assert!(matches!(
+        bad([1.0 / 6.0; 12]),
+        Err(ProfileError::NotNormalized { .. })
+    ));
+
+    let mut negative = [1.0 / 12.0; 12];
+    negative[0] = -0.5;
+    negative[1] = 1.0 / 12.0 + 0.5;
+    assert!(matches!(
+        bad(negative),
+        Err(ProfileError::Negative { month: 0, .. })
+    ));
+
+    let mut nan = [1.0 / 12.0; 12];
+    nan[3] = f32::NAN;
+    assert!(matches!(bad(nan), Err(ProfileError::Negative { .. })));
+}
+
+// --- capacity confidence ---------------------------------------------------
+
+/// The discount changes the ranking without touching the physics: a site whose
+/// capacity is a guess should look less attractive, not smaller.
+#[test]
+fn the_confidence_discount_moves_score_but_not_energy_or_cost() {
+    let dc = |id: &str, confidence| DataCenter {
+        id: id.into(),
+        name: id.into(),
+        region: Region::Nyc,
+        lat: 40.7128,
+        lon: -74.0060,
+        mw: 1.0,
+        cooling: Default::default(),
+        mw_confidence: confidence,
+        campus_id: None,
+        in_steam: false,
+        in_uten: false,
+    };
+    let sink = Sink {
+        id: "s_0".into(),
+        name: "pool".into(),
+        region: Region::Nyc,
+        // ~200 m north, comfortably inside the 1000 m radius.
+        lat: 40.7146,
+        lon: -74.0060,
+        cat: SinkCat::Pool,
+        demand_kwh: 5_000_000.0,
+        in_steam: false,
+        in_uten: false,
+    };
+
+    let engine = Engine::new(
+        vec![
+            dc("dc_sure", MwConfidence::Reported),
+            dc("dc_guess", MwConfidence::FootprintEstimate),
+        ],
+        vec![sink],
+        &[],
+    )
+    .unwrap();
+
+    let mut w = Weights::default_for(Region::Nyc);
+    w.confidence = ConfidenceWeights {
+        reported: 1.0,
+        filed: 0.95,
+        parcel_estimate: 0.7,
+        footprint_estimate: 0.5,
+    };
+    let ranked = engine
+        .rank(Region::Nyc, &w, &Econ::default_for(Region::Nyc))
+        .unwrap();
+
+    let sure = ranked.iter().find(|m| m.dc == "dc_sure").unwrap();
+    let guess = ranked.iter().find(|m| m.dc == "dc_guess").unwrap();
+
+    // Same facility twice over, so everything physical must agree exactly.
+    assert_relative_eq!(guess.supply_mwh, sure.supply_mwh);
+    assert_relative_eq!(guess.delivered_mwh, sure.delivered_mwh);
+    assert_relative_eq!(guess.utilization, sure.utilization);
+    assert_relative_eq!(guess.capex, sure.capex);
+    assert_relative_eq!(guess.annual_savings, sure.annual_savings);
+    // Only the ranking signal differs, by exactly the discount.
+    assert_relative_eq!(guess.score, sure.score * 0.5, max_relative = 1e-5);
+    assert!(sure.score > 0.0, "fixture must actually score");
+}
+
+/// New York's defaults must not discount anything, or every committed number
+/// would move.
+#[test]
+fn new_york_defaults_trust_every_capacity_grade() {
+    for region in [Region::Nyc, Region::Upstate] {
+        for (grade, weight) in Weights::default_for(region).confidence.iter() {
+            assert_eq!(weight, 1.0, "{region:?} discounts {grade:?}");
+        }
+    }
+    // Virginia is the region the grading exists for.
+    let nova = Weights::default_for(Region::Nova).confidence;
+    assert_eq!(nova.reported, 1.0);
+    assert!(nova.footprint_estimate < nova.parcel_estimate);
+    assert!(nova.parcel_estimate < nova.filed);
 }

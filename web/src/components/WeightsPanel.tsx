@@ -8,15 +8,13 @@ import { sweep, type Param, type Sweep } from "@/lib/sensitivity";
 import { useStore } from "@/lib/store";
 import {
   CAT_LABELS,
+  REGION_LABELS,
   REGIONS,
   SINK_CATS,
   type CatWeights,
   type Econ,
-  type Region,
   type Weights,
 } from "@/lib/types";
-
-const REGION_LABELS: Record<Region, string> = { nyc: "New York City", upstate: "Upstate" };
 
 /** Marks over a slider's track where the selected site's rank would change.
  *  Accent when the move is up the ranking, ember when down. */

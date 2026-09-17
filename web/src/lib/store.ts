@@ -14,7 +14,15 @@ import { create } from "zustand";
 
 import { loadEngine, type Engine, type LoadProgress } from "./engine";
 import { decodeScenario, encodeScenario, readScenarioParam, writeScenarioParam } from "./scenario";
-import { REGIONS, type Contribution, type Econ, type Match, type Region, type Weights } from "./types";
+import {
+  REGIONS,
+  type Contribution,
+  type Econ,
+  type Match,
+  type Region,
+  type RegionView,
+  type Weights,
+} from "./types";
 
 type ByRegion<T> = Record<Region, T>;
 
@@ -42,6 +50,8 @@ interface State {
   econ: ByRegion<Econ> | null;
   /** Which region's parameters the assumptions panel edits. */
   tuningRegion: Region;
+  /** Which region the map and ranking show. "all" is the cross-region view. */
+  viewRegion: RegionView;
 
   results: Match[];
   /** Rank per site before the most recent recompute, for showing movement. */
@@ -65,6 +75,7 @@ interface State {
   init: () => Promise<void>;
   setTheme: (theme: Theme) => void;
   setTuningRegion: (region: Region) => void;
+  setViewRegion: (region: RegionView) => void;
   setWeights: (patch: Partial<Weights>) => void;
   setEcon: (patch: Partial<Econ>) => void;
   resetDefaults: () => void;
@@ -125,6 +136,7 @@ export const useStore = create<State>((set, get) => ({
   weights: null,
   econ: null,
   tuningRegion: "nyc",
+  viewRegion: "all",
   results: [],
   prevRanks: new Map(),
   selectedDc: null,
@@ -163,6 +175,12 @@ export const useStore = create<State>((set, get) => ({
   },
 
   setTuningRegion: (tuningRegion) => set({ tuningRegion }),
+
+  // Choosing a single region also points the sliders at it: editing New York's
+  // assumptions while looking only at Virginia is never what was meant. "All"
+  // leaves the tuning target alone, since there is no one region to pick.
+  setViewRegion: (viewRegion) =>
+    set(viewRegion === "all" ? { viewRegion } : { viewRegion, tuningRegion: viewRegion }),
 
   setWeights: (patch) => {
     const { weights, tuningRegion } = get();

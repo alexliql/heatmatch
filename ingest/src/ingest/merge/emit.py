@@ -60,6 +60,23 @@ def write_features(name: str, features: list[dict]) -> dict:
     return {"file": path.name, "count": len(features), "hash": digest}
 
 
+def write_json(name: str, payload: dict) -> dict:
+    """Write data/<name>.<hash8>.json; return its manifest entry.
+
+    For assets that are not feature collections — the seasonal profile table is
+    the first. `count` is the number of top-level keys, which for profiles is
+    the number of regions that model their own shapes.
+    """
+    body = canonical(payload)
+    digest = hashlib.sha256(body.encode()).hexdigest()
+    DATA.mkdir(parents=True, exist_ok=True)
+    for old in DATA.glob(f"{name}.*.json"):
+        old.unlink()
+    path = DATA / f"{name}.{digest[:8]}.json"
+    path.write_text(body)
+    return {"file": path.name, "count": len(payload), "hash": digest}
+
+
 def write_manifest(entries: dict[str, dict], sources: list[dict]) -> Path:
     manifest = {
         "built_at": datetime.now(UTC).isoformat(timespec="seconds"),
@@ -69,3 +86,23 @@ def write_manifest(entries: dict[str, dict], sources: list[dict]) -> Path:
     path = DATA / "manifest.json"
     path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
     return path
+
+
+def assign_ids(rows: list[dict], prefix: str, width: int) -> list[tuple[str, dict]]:
+    """Number rows within their region, best-effort stable across releases.
+
+    Sorting on position-then-name (§3.2) is what makes ids reproducible: the
+    upstream file's row order is not guaranteed stable between releases. The
+    region goes in the id rather than in a single global counter so that adding
+    a region cannot renumber the ones already published — Virginia sorts south
+    of every New York site, and a global counter would have shifted all of them.
+    """
+    rows.sort(key=lambda r: (r["region"], r["lat"], r["lon"], r["name"]))
+    out: list[tuple[str, dict]] = []
+    seen: dict[str, int] = {}
+    for row in rows:
+        region = row["region"]
+        i = seen.get(region, 0)
+        seen[region] = i + 1
+        out.append((f"{prefix}_{region}_{i:0{width}d}", row))
+    return out

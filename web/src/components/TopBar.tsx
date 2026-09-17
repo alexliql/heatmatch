@@ -23,7 +23,7 @@ export function TopBar({ onAbout }: { onAbout: () => void }) {
   return (
     <header className="topbar float" data-compact={compact}>
       <h1 className="wordmark">heatmatch</h1>
-      <span className="tagline">Which New York data centers could usefully heat their neighbours?</span>
+      <span className="tagline">Which data centers could usefully heat their neighbours?</span>
       <div className="topbar-actions">
         {/* On phones the theme toggle lives in the panel foot instead. */}
         {!compact && (

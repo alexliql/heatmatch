@@ -7,9 +7,10 @@
 
 use geo::{Coord, LineString, Polygon};
 use geojson::{GeoJson, Value as GeoValue};
-use heatmatch_core::{DataCenter, Econ, Engine, Region, Sink, Weights};
+use heatmatch_core::{DataCenter, Econ, Engine, ProfileOverrides, Region, Sink, Weights};
 use serde::de::DeserializeOwned;
 use serde_json::{Map, Value};
+use std::collections::HashMap;
 use wasm_bindgen::prelude::*;
 
 /// Turn a JS error into something a user can act on.
@@ -18,13 +19,34 @@ fn err(context: &str, e: impl std::fmt::Display) -> JsError {
 }
 
 fn parse_region(s: &str) -> Result<Region, JsError> {
-    match s {
-        "nyc" => Ok(Region::Nyc),
-        "upstate" => Ok(Region::Upstate),
-        other => Err(JsError::new(&format!(
-            "unknown region {other:?}; expected \"nyc\" or \"upstate\""
-        ))),
+    Region::ALL
+        .into_iter()
+        .find(|r| r.as_str() == s)
+        .ok_or_else(|| {
+            let known: Vec<String> = Region::ALL
+                .iter()
+                .map(|r| format!("{:?}", r.as_str()))
+                .collect();
+            JsError::new(&format!(
+                "unknown region {s:?}; expected one of {}",
+                known.join(", ")
+            ))
+        })
+}
+
+/// Per-region seasonal profiles, as the `profiles` bundle asset carries them:
+/// `{"nova": {"hospital": [...12 shares...], ...}}`. Regions and categories it
+/// omits keep the built-in shapes.
+fn parse_profiles(raw: &str) -> Result<HashMap<Region, ProfileOverrides>, JsError> {
+    if raw.trim().is_empty() {
+        return Ok(HashMap::new());
     }
+    let by_name: HashMap<String, ProfileOverrides> =
+        serde_json::from_str(raw).map_err(|e| err("parsing profiles", e))?;
+    by_name
+        .into_iter()
+        .map(|(name, p)| parse_region(&name).map(|r| (r, p)))
+        .collect()
 }
 
 /// Flatten a point feature into the shape core's types deserialize from.
@@ -107,13 +129,14 @@ pub struct WasmEngine {
 
 #[wasm_bindgen]
 impl WasmEngine {
-    /// Build the engine from the three data assets. `water_geojson` may be an
-    /// empty string when no hydrography has been published yet.
+    /// Build the engine from the data assets. `water_geojson` and
+    /// `profiles_json` may be empty strings when those assets are not published.
     #[wasm_bindgen(constructor)]
     pub fn new(
         dcs_geojson: &str,
         sinks_geojson: &str,
         water_geojson: &str,
+        profiles_json: &str,
     ) -> Result<WasmEngine, JsError> {
         // Without this a Rust panic surfaces in the console as "unreachable".
         console_error_panic_hook::set_once();
@@ -121,9 +144,11 @@ impl WasmEngine {
         let dcs: Vec<DataCenter> = point_features(dcs_geojson, "data centers")?;
         let sinks: Vec<Sink> = point_features(sinks_geojson, "sinks")?;
         let water = water_polygons(water_geojson)?;
+        let profiles = parse_profiles(profiles_json)?;
 
         Ok(Self {
-            inner: Engine::new(dcs, sinks, &water).map_err(|e| err("building engine", e))?,
+            inner: Engine::with_profiles(dcs, sinks, &water, &profiles)
+                .map_err(|e| err("building engine", e))?,
         })
     }
 
@@ -145,20 +170,24 @@ impl WasmEngine {
         to_js(&contribs)
     }
 
-    /// Monthly demand shape per sink category, so the UI can draw the
-    /// supply-vs-demand strip without duplicating the table.
-    pub fn profiles() -> Result<JsValue, JsError> {
-        let map: std::collections::BTreeMap<String, [f32; 12]> =
-            heatmatch_core::season::all_profiles()
-                .into_iter()
-                .map(|(cat, p)| {
-                    let key = serde_json::to_value(cat)
-                        .ok()
-                        .and_then(|v| v.as_str().map(str::to_owned))
-                        .unwrap_or_default();
-                    (key, p)
-                })
-                .collect();
+    /// Monthly demand shape per sink category for one region, so the UI can
+    /// draw the supply-vs-demand strip without duplicating the table.
+    ///
+    /// An instance method, not a static one: a region may override the shapes
+    /// from the data bundle, so the answer depends on what was loaded.
+    pub fn profiles(&self, region: &str) -> Result<JsValue, JsError> {
+        let map: std::collections::BTreeMap<String, [f32; 12]> = self
+            .inner
+            .profiles(parse_region(region)?)
+            .into_iter()
+            .map(|(cat, p)| {
+                let key = serde_json::to_value(cat)
+                    .ok()
+                    .and_then(|v| v.as_str().map(str::to_owned))
+                    .unwrap_or_default();
+                (key, p)
+            })
+            .collect();
         to_js(&map)
     }
 

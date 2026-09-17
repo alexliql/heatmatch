@@ -2,7 +2,7 @@
 
 import pytest
 
-from ingest.config import MIN_AREA_M2
+from ingest.config import MIN_AREA_M2, min_area_for
 from ingest.sources.osm import _dedupe, _footprint, _query
 
 ANCHORS = [(40.7128, -74.0060), (40.75, -73.99)]
@@ -91,3 +91,27 @@ def test_dedupe_keeps_different_categories_at_one_location() -> None:
         {"cat": "office", "lat": 40.75, "lon": -73.98, "demand_kwh": 100.0, "name": "o"},
     ]
     assert len(_dedupe(rows)) == 2
+
+
+def test_virginia_gates_out_back_garden_pools() -> None:
+    """Pool carries the highest category weight, so junk there decides the map.
+
+    Suburban OpenStreetMap coverage in Northern Virginia includes domestic
+    pools — 544 of 588 matches were unnamed with a median area of 81 m2, while
+    the named community pools start around 330 m2.
+    """
+    assert min_area_for("nova")["pool"] == 250.0
+    # New York has the same problem but is deliberately left alone: changing it
+    # would move already-published results.
+    assert "pool" not in min_area_for("nyc")
+    # The other gates carry over rather than being replaced wholesale.
+    assert min_area_for("nova")["office"] == min_area_for("nyc")["office"]
+
+
+def test_a_gated_category_does_not_ask_overpass_for_nodes() -> None:
+    """A node has no footprint, so it can never clear a gate — and for a broad
+    selector the discarded nodes are most of the response."""
+    anchors = [(39.0, -77.4)]
+    assert "node" not in _query("pool", anchors, 3000.0, min_area_for("nova"))
+    # Ungated elsewhere, where a pool mapped as a point is still worth having.
+    assert "node" in _query("pool", anchors, 3000.0, min_area_for("nyc"))

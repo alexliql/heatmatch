@@ -12,9 +12,10 @@ from pathlib import Path
 
 DATA = Path(__file__).resolve().parent.parent / "data"
 # The full set the finished pipeline emits. Assets absent from the manifest are
-# reported but not failed: the pipeline is built in phases and water/zones do
-# not exist until T8. Anything the manifest *does* name must be consistent.
-ASSETS = ("datacenters", "sinks", "water", "zones")
+# reported but not failed: the pipeline is built in phases, and `profiles` only
+# appears once a region models its own seasonal shapes. Anything the manifest
+# *does* name must be consistent.
+ASSETS = ("datacenters", "sinks", "water", "zones", "profiles")
 
 
 def main() -> int:

@@ -7,7 +7,9 @@ from ingest.config import (
     DEFAULT_DC_MW,
     FLOORS_GUESS,
     INTENSITY_KWH_PER_M2,
+    MAX_ESTIMATED_DC_MW,
     MW_PER_SQFT,
+    MW_PER_SQFT_BY_REGION,
     region_for,
 )
 from ingest.sources.osm import _demand, _floors
@@ -23,6 +25,21 @@ def test_region_for_prefers_nyc_over_containing_upstate_bbox() -> None:
 
 def test_mw_from_sqft_matches_75w_per_sqft() -> None:
     assert 70_000 * MW_PER_SQFT == pytest.approx(5.25)
+
+
+def test_virginia_uses_a_lower_density_and_a_higher_ceiling() -> None:
+    """The Atlas reports footprints, and Virginia's are purpose-built halls.
+
+    A 25 MW ceiling is right for a Manhattan tower that is mostly offices and
+    wrong for an Ashburn hall that is mostly white space; clipping there would
+    give most of the cluster the same capacity and flatten the ranking.
+    """
+    assert MW_PER_SQFT_BY_REGION["nova"] < MW_PER_SQFT_BY_REGION["nyc"] * 2
+    assert MW_PER_SQFT_BY_REGION["nyc"] == MW_PER_SQFT
+    assert MAX_ESTIMATED_DC_MW["nova"] > MAX_ESTIMATED_DC_MW["nyc"]
+    # The ceiling must not bind on a realistic footprint, or it is doing the
+    # estimating instead of guarding it. 550k sq ft is the largest in the data.
+    assert 550_000 * MW_PER_SQFT_BY_REGION["nova"] < MAX_ESTIMATED_DC_MW["nova"]
 
 
 def test_default_mw_used_when_footprint_missing() -> None:
