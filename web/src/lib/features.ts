@@ -14,15 +14,25 @@ export interface SinkProps {
   name: string;
   cat: SinkCat;
   demand_kwh: number;
+  lngLat: [number, number];
+}
+
+export interface DcProps {
+  name: string;
+  mw: number;
+  cooling: string;
+  region: string;
+  lngLat: [number, number];
 }
 
 export interface FeatureIndex {
   dcNames: Map<string, string>;
+  dcs: Map<string, DcProps>;
   sinks: Map<string, SinkProps>;
 }
 
 interface Collection<T> {
-  features: { properties: T }[];
+  features: { properties: T; geometry: { coordinates: [number, number] } }[];
 }
 
 /** Ingest writes this when OpenStreetMap has no name for a feature. */
@@ -32,18 +42,27 @@ export function isPlaceholderName(name: string): boolean {
 
 export function buildIndex(engine: Engine | null): FeatureIndex {
   const dcNames = new Map<string, string>();
+  const dcs = new Map<string, DcProps>();
   const sinks = new Map<string, SinkProps>();
-  if (!engine) return { dcNames, sinks };
+  if (!engine) return { dcNames, dcs, sinks };
 
-  const dcs = engine.geo.datacenters as Collection<{ id: string; name: string }> | undefined;
-  for (const f of dcs?.features ?? []) dcNames.set(f.properties.id, f.properties.name);
+  const dcFc = engine.geo.datacenters as
+    | Collection<{ id: string; name: string; mw: number; cooling: string; region: string }>
+    | undefined;
+  for (const f of dcFc?.features ?? []) {
+    const { id, name, mw, cooling, region } = f.properties;
+    dcNames.set(id, name);
+    dcs.set(id, { name, mw, cooling, region, lngLat: f.geometry.coordinates });
+  }
 
-  const sinkFc = engine.geo.sinks as Collection<{ id: string } & SinkProps> | undefined;
+  const sinkFc = engine.geo.sinks as
+    | Collection<{ id: string; name: string; cat: SinkCat; demand_kwh: number }>
+    | undefined;
   for (const f of sinkFc?.features ?? []) {
     const { id, name, cat, demand_kwh } = f.properties;
-    sinks.set(id, { name, cat, demand_kwh });
+    sinks.set(id, { name, cat, demand_kwh, lngLat: f.geometry.coordinates });
   }
-  return { dcNames, sinks };
+  return { dcNames, dcs, sinks };
 }
 
 export function useFeatureIndex(engine: Engine | null): FeatureIndex {
