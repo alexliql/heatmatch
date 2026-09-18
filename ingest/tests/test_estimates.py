@@ -68,7 +68,9 @@ def test_zero_area_does_not_produce_zero_demand() -> None:
     assert demand > 0
 
 
-@pytest.mark.parametrize("raw,expected", [("5", 5.0), ("3;4", 3.0), (None, None), ("abc", None), ("0", None)])
+@pytest.mark.parametrize(
+    "raw,expected", [("5", 5.0), ("3;4", 3.0), (None, None), ("abc", None), ("0", None)]
+)
 def test_floors_parsing(raw: str | None, expected: float | None) -> None:
     tags = {} if raw is None else {"building:levels": raw}
     assert _floors(tags, "office") == (expected if expected else FLOORS_GUESS["office"])

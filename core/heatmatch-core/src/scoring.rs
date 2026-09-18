@@ -303,6 +303,7 @@ impl Engine {
                 Contribution {
                     sink: data.sinks[c.idx].id.clone(),
                     cat: data.sinks[c.idx].cat,
+                    counterfactual: data.sinks[c.idx].counterfactual,
                     dist_m: c.dist_m,
                     pipe_m: c.pipe_m,
                     crosses_water: c.crosses_water,
@@ -359,6 +360,7 @@ impl Engine {
                 pipe_m: c.pipe_m,
                 delivered_mwh: c.delivered_mwh,
                 cop: c.hp_required.then_some(c.cop),
+                counterfactual: c.counterfactual,
             })
             .collect();
         let economics = econ::evaluate(&connections, delivered_mwh, e, w.utilization_hours);

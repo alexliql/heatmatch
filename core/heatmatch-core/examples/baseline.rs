@@ -1,7 +1,7 @@
-//! Regenerate `tests/fixtures/ny_baseline.json` — the New York results that
-//! `tests/regression.rs` pins. Run only when a change to the NY numbers is
-//! intended and understood:
-//! `cargo run --release --example ny_baseline -p heatmatch-core`
+//! Regenerate `tests/fixtures/baseline.json` — the results `tests/regression.rs`
+//! pins for every shipped region. Run only when a change to those numbers is
+//! intended and understood, and say which moved and why in the commit:
+//! `cargo run --release --example baseline -p heatmatch-core`
 
 use std::fs;
 use std::path::PathBuf;
@@ -45,7 +45,8 @@ fn main() {
     let engine = Engine::new(dcs, sinks, &[]).unwrap();
 
     let mut out = Map::new();
-    for region in [Region::Nyc, Region::Upstate] {
+    // Every shipped region. Keep in step with `PINNED` in tests/regression.rs.
+    for region in [Region::Nyc, Region::Upstate, Region::Nova] {
         let ranked = engine
             .rank(
                 region,
@@ -72,7 +73,7 @@ fn main() {
         out.insert(region.as_str().to_string(), Value::Array(rows));
     }
 
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/ny_baseline.json");
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/baseline.json");
     fs::write(
         &path,
         serde_json::to_string_pretty(&Value::Object(out)).unwrap() + "\n",

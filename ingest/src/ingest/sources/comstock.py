@@ -20,10 +20,19 @@ Two products, from two different slices of the release:
   building type*, about 770 MB for seven counties, and the month-to-month shape
   barely varies across adjacent counties in one climate zone.
 
-Heating fuels only, matching the LL84 treatment in `ll84.py`: gas, oil and
-propane for space heating and service hot water. Electricity is excluded
-because it is not what a heat network would displace, and district heating is
-excluded because that heat is already supplied.
+Demand is **delivered heat** — what the heating system put into the building —
+not the fuel it bought. Per sampled building:
+
+    delivered = (gas + oil + propane)[heating + hot water] × BOILER_EFF
+              + district heat[heating + hot water]              (already heat)
+              + electric heating × (COP if a heat pump else 1)
+              + electric hot water × 1                          (no HPWH in baseline stock)
+
+The fuel-only basis this replaced saw a quarter of the stock in Virginia: large
+offices there are 52% electric resistance and 24% district heat. In hydro-
+electric Seattle or heat-pump California it would have seen almost nothing.
+Every intensity still reports `kwh_per_m2_fuel_only` so the difference stays
+visible.
 """
 
 from __future__ import annotations
@@ -35,6 +44,7 @@ from functools import lru_cache
 import pandas as pd
 
 from ingest.config import (
+    BOILER_EFF,
     COMSTOCK_BASE_URL,
     COMSTOCK_LARGE_OFFICE_M2,
     COMSTOCK_MIN_SAMPLES,
@@ -42,6 +52,7 @@ from ingest.config import (
     COMSTOCK_RELEASE,
     COMSTOCK_SOURCE,
     COMSTOCK_TYPE_BY_CAT,
+    EXISTING_HEAT_PUMP_COP,
     REGIONS,
     RegionName,
     SinkCat,
@@ -51,20 +62,8 @@ from ingest.sources.fetch import cached_get
 # Floor area arrives in square feet; the schema works in square metres.
 SQFT_TO_M2 = 0.09290304
 
-# Non-electric heating end uses. The two spellings are not a typo: the metadata
+# Combustion heating end uses. The two spellings are not a typo: the metadata
 # parquet separates unit from name with two dots, the timeseries CSVs with one.
-#
-# Electric heating is deliberately excluded, matching how `ll84.py` treats New
-# York: the economics downstream price delivered heat against a displaced gas
-# boiler, so counting electrically heated floor area as demand would be costing
-# a saving that is not there.
-#
-# The cost is real and Virginia-specific, which is why `electric_heating_share`
-# is reported alongside every intensity: in this mild a climate much of the
-# commercial stock runs heat pumps, so only 36% of large offices burn any fuel
-# at all and the fuel-only intensity is correspondingly low. Those buildings
-# still have thermal demand a heat network could serve; this model does not
-# count it. See the README's Virginia limitations.
 _HEATING_ENDUSES = [
     ("natural_gas", "heating"),
     ("natural_gas", "water_systems"),
@@ -80,13 +79,54 @@ def _columns(sep: str) -> list[str]:
 
 
 METADATA_COLUMNS = _columns("..")
-TIMESERIES_COLUMNS = _columns(".")
-
-# Reported as a caveat, never added to demand.
-ELECTRIC_HEATING_COLUMNS = [
-    "out.electricity.heating.energy_consumption..kwh",
-    "out.electricity.water_systems.energy_consumption..kwh",
+# The monthly shape is taken over every heating end-use, whatever the fuel.
+# The timeseries is aggregated across buildings, so a heat pump's electricity
+# cannot be scaled by its COP here as it is in the annual figure; it enters at
+# unit weight, which slightly flattens the shape for heat-pump-heavy stock.
+TIMESERIES_COLUMNS = _columns(".") + [
+    "out.district_heating.heating.energy_consumption.kwh",
+    "out.district_heating.water_systems.energy_consumption.kwh",
+    "out.electricity.heating.energy_consumption.kwh",
+    "out.electricity.water_systems.energy_consumption.kwh",
 ]
+
+ELECTRIC_HEATING = "out.electricity.heating.energy_consumption..kwh"
+ELECTRIC_WATER = "out.electricity.water_systems.energy_consumption..kwh"
+DISTRICT_COLUMNS = [
+    "out.district_heating.heating.energy_consumption..kwh",
+    "out.district_heating.water_systems.energy_consumption..kwh",
+]
+# How the building heats. Values seen in the release: Furnace, Boiler,
+# Electric Resistance, ASHP, WSHP, GSHP, District.
+HEAT_TYPE = "in.hvac_heat_type"
+HEAT_PUMP_TYPES = frozenset({"ASHP", "WSHP", "GSHP"})
+
+# What each ComStock heating system would be displaced *as*. District heat is
+# priced as gas: it is overwhelmingly gas-fired steam, and district-heated
+# sinks are in any case the ones the steam rule drops.
+COUNTERFACTUAL_BY_HEAT_TYPE = {
+    "Furnace": "gas",
+    "Boiler": "gas",
+    "District": "gas",
+    "Electric Resistance": "electric_resistance",
+    "ASHP": "heat_pump",
+    "WSHP": "heat_pump",
+    "GSHP": "heat_pump",
+}
+
+# Recorded in every derived file, so the basis a number was computed on is in
+# the file next to the number.
+BASIS = {
+    "quantity": "delivered heat, kWh per m2 of floor area, weighted by ComStock `weight`",
+    "combustion": f"{[f'{f}.{u}' for f, u in _HEATING_ENDUSES]} x BOILER_EFF={BOILER_EFF}",
+    "district": "out.district_heating.{heating,water_systems} x 1.0",
+    "electric_heating": f"{ELECTRIC_HEATING} x {EXISTING_HEAT_PUMP_COP} if {HEAT_TYPE} in "
+    f"{sorted(HEAT_PUMP_TYPES)} else x 1.0",
+    "electric_water": f"{ELECTRIC_WATER} x 1.0 (baseline stock has no heat-pump water heaters)",
+    "counterfactual": f"weighted majority of {HEAT_TYPE} via {COUNTERFACTUAL_BY_HEAT_TYPE}",
+    "monthly": "share by month of every heating end-use across all fuels, state-level "
+    "aggregate; electric heating at unit weight (no per-building COP available)",
+}
 
 
 def _gisjoin(state_fips: str, county_fips: str) -> str:
@@ -128,12 +168,15 @@ def annual_intensity(region: RegionName, *, refresh: bool = False) -> dict[str, 
         "in.comstock_building_type",
         "in.sqft..ft2",
         "weight",
+        HEAT_TYPE,
         *METADATA_COLUMNS,
-        *ELECTRIC_HEATING_COLUMNS,
+        *DISTRICT_COLUMNS,
+        ELECTRIC_HEATING,
+        ELECTRIC_WATER,
     ]
 
     frames = []
-    for county_fips in county_fips_for(region, refresh=refresh):
+    for county_fips in county_fips_for(region):
         gisjoin = _gisjoin(cfg["state_fips"], county_fips)
         path = cached_get(
             _county_metadata_url(state, gisjoin),
@@ -143,36 +186,54 @@ def annual_intensity(region: RegionName, *, refresh: bool = False) -> dict[str, 
         frames.append(pd.read_parquet(path, columns=wanted))
 
     df = pd.concat(frames, ignore_index=True)
+    w = df["weight"]
     # `weight` scales each sampled building up to the stock it represents, so
     # both numerator and denominator must carry it or the ratio is a simple
     # sample mean of a deliberately non-uniform sample.
-    heat = df[METADATA_COLUMNS].sum(axis=1) * df["weight"]
-    area = df["in.sqft..ft2"] * SQFT_TO_M2 * df["weight"]
+    area = df["in.sqft..ft2"] * SQFT_TO_M2 * w
 
-    electric = df[ELECTRIC_HEATING_COLUMNS].sum(axis=1) * df["weight"]
-    burns_fuel = df[METADATA_COLUMNS].sum(axis=1) > 0
+    # The release pads some values ("Boiler "); an unstripped one would miss
+    # the counterfactual table and default to gas, wrongly for a resistance
+    # building.
+    df[HEAT_TYPE] = df[HEAT_TYPE].astype(str).str.strip()
+
+    fuel_in = df[METADATA_COLUMNS].sum(axis=1)
+    is_heat_pump = df[HEAT_TYPE].isin(HEAT_PUMP_TYPES)
+    # Electricity into a heat pump comes out as several times as much heat;
+    # into a resistance element, as exactly as much.
+    electric_heat = df[ELECTRIC_HEATING] * is_heat_pump.map(
+        {True: EXISTING_HEAT_PUMP_COP, False: 1.0}
+    )
+    delivered = (
+        fuel_in * BOILER_EFF + df[DISTRICT_COLUMNS].sum(axis=1) + electric_heat + df[ELECTRIC_WATER]
+    ) * w
+    fuel_delivered = fuel_in * BOILER_EFF * w
+    burns_fuel = fuel_in > 0
 
     out: dict[str, dict] = {}
     for building_type, group in df.groupby("in.comstock_building_type"):
         # Too few sampled buildings to publish a number from. ComStock samples
-        # hospitals thinly — six across all seven jurisdictions — so hospitals
-        # fall through to the category constant rather than being described by
-        # half a dozen simulations.
+        # hospitals thinly — six across all of Northern Virginia — so hospitals
+        # there fall through to the category constant rather than being
+        # described by half a dozen simulations.
         if len(group) < COMSTOCK_MIN_SAMPLES:
             continue
-        area_sum = area.loc[group.index].sum()
+        idx = group.index
+        area_sum = area.loc[idx].sum()
         if area_sum <= 0:
             continue
-        fuel_sum = heat.loc[group.index].sum()
+        # The stock's dominant heating system, by the floor area it heats.
+        by_type = (w.loc[idx] * df["in.sqft..ft2"].loc[idx]).groupby(df[HEAT_TYPE].loc[idx]).sum()
+        majority = str(by_type.idxmax()) if len(by_type) else "Furnace"
         out[str(building_type)] = {
-            "kwh_per_m2": float(fuel_sum / area_sum),
+            "kwh_per_m2": float(delivered.loc[idx].sum() / area_sum),
+            "counterfactual": COUNTERFACTUAL_BY_HEAT_TYPE.get(majority, "gas"),
+            "majority_heat_type": majority,
             "samples": len(group),
-            # What this intensity leaves out, so the limitation is a number in
-            # the file rather than a sentence in a README nobody reads.
-            "fuel_heated_share": float(burns_fuel.loc[group.index].mean()),
-            "kwh_per_m2_incl_electric": float(
-                (fuel_sum + electric.loc[group.index].sum()) / area_sum
-            ),
+            # The basis this replaced, kept so the difference stays a number
+            # in the file rather than a sentence in a README nobody reads.
+            "kwh_per_m2_fuel_only": float(fuel_delivered.loc[idx].sum() / area_sum),
+            "fuel_heated_share": float(burns_fuel.loc[idx].mean()),
         }
     return out
 
@@ -212,16 +273,11 @@ def monthly_shape(
     return out
 
 
-def county_fips_for(region: RegionName, *, refresh: bool = False) -> list[str]:
-    """County FIPS codes for a region's named jurisdictions, from TIGER.
-
-    Read from the boundary file rather than hardcoded: the same file already
-    has to be downloaded for the clip, and a hand-written table of Virginia
-    independent-city codes is exactly the kind of thing that rots silently.
-    """
+def county_fips_for(region: RegionName) -> list[str]:
+    """County FIPS codes for a region's ComStock table, from config."""
     from ingest.sources.boundary import county_codes
 
-    return county_codes(region, refresh=refresh)
+    return county_codes(region)
 
 
 @lru_cache(maxsize=4)
@@ -237,9 +293,8 @@ def build(region: RegionName, *, refresh: bool = False) -> dict:
     return {
         "release": COMSTOCK_RELEASE,
         "climate_zone": REGIONS[region].get("climate_zone"),
-        "by_type": {
-            t: {**v, "monthly": shapes[t]} for t, v in intensity.items() if t in shapes
-        },
+        "basis": BASIS,
+        "by_type": {t: {**v, "monthly": shapes[t]} for t, v in intensity.items() if t in shapes},
     }
 
 
@@ -273,6 +328,12 @@ def demand_kwh(
     if entry is None:
         return None
     return area_m2 * entry["kwh_per_m2"], "comstock_modeled"
+
+
+def intensity_for(cat: SinkCat, area_m2: float | None, table: dict[str, dict]) -> dict | None:
+    """The ComStock entry standing in for a sink, or None if there is none."""
+    building_type = comstock_type(cat, area_m2)
+    return table.get(building_type) if building_type else None
 
 
 def profiles_for_region(table: dict[str, dict]) -> dict[str, list[float]]:

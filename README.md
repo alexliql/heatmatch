@@ -64,6 +64,59 @@ would that be?** It is a ranking signal, not a measurement.
 7. **Cost it.** Pipe and heat-pump capital against displaced gas, heat-pump
    electricity and avoided cooling.
 
+### Demand is delivered heat, and every sink has a counterfactual
+
+Every sink's `demand_kwh` is the heat its heating system delivered into its
+spaces and hot water over a year — not the fuel it bought to do so. That is the
+quantity a heat network would replace, and it is what the engine prices:
+`econ.rs` divides delivered heat by boiler efficiency (0.85) to recover the fuel
+avoided. So a measured source that reports fuel *input* — LL84 does — is scaled
+by 0.85 on the way in. Before this, LL84 sinks were both overstated by 1/0.85
+and had their savings inflated by the same factor.
+
+ComStock-modelled demand is built on the same basis, per sampled building:
+
+```
+delivered = (gas + oil + propane)[heating + hot water] × 0.85
+          + district heat[heating + hot water]              (already heat)
+          + electric heating  × (3.0 if a heat pump, else 1.0)
+          + electric hot water × 1.0    (baseline stock has no heat-pump water heaters)
+```
+
+This matters far more than it sounds. On a fuel-only basis, a building heated
+electrically reads as having almost no demand — and in Loudoun County, large
+offices are **52% electric resistance and 24% district heat**. Fuel-only saw the
+remaining quarter and put the large-office intensity at 10 kWh/m²; delivered
+heat puts it at 35. Every derived intensity file records the basis it was
+computed on under `"basis"`, and keeps `kwh_per_m2_fuel_only` beside the number
+so the difference stays visible.
+
+Each sink also carries a **`counterfactual`**: what it heats with today, and so
+what a connection would displace. A gas boiler saves gas at boiler efficiency; a
+resistance heater saves a full MWh of electricity per MWh of heat; an existing
+heat pump saves only the third or so of a MWh it would have drawn. In a place
+where electricity costs far more than gas, a resistance-heated building is the
+best sink on the map — and without this field the model would call it worthless.
+
+| `counterfactual` | avoided cost per delivered MWh | how it is assigned |
+|---|---|---|
+| `gas` | `gas_price / boiler_eff` | measured sinks whose thermal fuels dominate; every footprint or category estimate (an estimate of demand says nothing about equipment) |
+| `electric_resistance` | `elec_price` | modelled sinks whose ComStock type is majority resistance-heated |
+| `heat_pump` | `elec_price / 3.0` | modelled sinks whose ComStock type is majority heat-pump |
+
+Gas versus heat pump is not a fixed ordering: at a 3.6:1 electricity-to-gas
+price ratio a COP-3 pump costs slightly *more* per MWh of heat than a boiler,
+at 2:1 slightly less. That is a finding about prices, which is why the field
+exists.
+
+One more rule. A measured building reporting almost no thermal fuel is usually
+not a building without heating — it is one heated electrically, which the fuel
+columns cannot see. Where a measurement is below 10 kWh/m² and ComStock says a
+typical building of that type wants more than 30, the measurement is set aside
+for the model and the sink carries `demand_note: "measured_fuel_near_zero"`. New
+York City reads its ComStock table for this alone; its footprint and category
+estimates are never replaced. In the current bundle it fired on no NYC building.
+
 ### Constants and why they are what they are
 
 Everything below is tunable in the app. The defaults are starting points, not
@@ -140,19 +193,8 @@ Sinks carry `demand_source: "comstock_modeled"` to say so. **A ComStock
 intensity describes a typical building of its type in climate zone 4A — not the
 specific building on the map.**
 
-Three things this gets wrong, in decreasing order of how much they matter:
+Two things this gets wrong:
 
-- **Electrically heated buildings read as having almost no demand.** The
-  intensities count gas, oil and propane only, matching how New York's LL84
-  figures are treated and how the economics price a displaced gas boiler. But
-  Virginia's mild climate means much of the commercial stock runs heat pumps:
-  only **36% of large offices burn any fuel at all**, which drags the
-  fuel-only large-office intensity to 10 kWh/m² against 24 kWh/m² including
-  electric heat. Those buildings still have thermal demand a heat network could
-  serve. This model does not count it, so Virginia office demand is understated.
-  Every intensity in `ingest/derived/va_intensity.json` carries a
-  `fuel_heated_share` and a `kwh_per_m2_incl_electric` so the size of the gap is
-  visible rather than buried here.
 - **Hospitals get no ComStock intensity at all.** ComStock samples only six
   hospitals across the seven jurisdictions, below the 30-sample floor the
   pipeline requires before publishing a number. Virginia hospitals therefore

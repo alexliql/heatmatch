@@ -6,8 +6,8 @@ use approx::assert_relative_eq;
 use geo::{Coord, LineString, Polygon};
 use heatmatch_core::{
     distance::pipe_length, season, season::ProfileError, thermo, ConfidenceWeights, Cooling,
-    DataCenter, DistanceModel, Econ, Engine, MwConfidence, ProfileOverrides, Region, Sink, SinkCat,
-    WaterPolicy, Weights,
+    Counterfactual, DataCenter, DistanceModel, Econ, Engine, MwConfidence, ProfileOverrides,
+    Region, Sink, SinkCat, WaterPolicy, Weights,
 };
 
 // --- thermodynamics -------------------------------------------------------
@@ -297,6 +297,7 @@ fn the_confidence_discount_moves_score_but_not_energy_or_cost() {
         lon: -74.0060,
         cat: SinkCat::Pool,
         demand_kwh: 5_000_000.0,
+        counterfactual: Default::default(),
         in_steam: false,
         in_uten: false,
     };
@@ -350,4 +351,108 @@ fn new_york_defaults_trust_every_capacity_grade() {
     assert_eq!(nova.reported, 1.0);
     assert!(nova.footprint_estimate < nova.parcel_estimate);
     assert!(nova.parcel_estimate < nova.filed);
+}
+
+// --- counterfactual economics -----------------------------------------------
+
+/// The claim the whole change rests on: a connection set with no counterfactual
+/// information prices exactly — bit for bit — as it did before the field
+/// existed. Not "within tolerance": the regression snapshot compares exact
+/// f32s, and an ulp here would fail every New York site.
+#[test]
+fn an_all_gas_connection_set_prices_exactly_as_before() {
+    use heatmatch_core::econ::{evaluate, Connection};
+    let e = Econ::default_for(Region::Nyc);
+    let hours = 0.9 * 8760.0;
+    let connections: Vec<Connection> = [
+        (1200.0f32, 3_100.0f32),
+        (800.0, 1_950.0),
+        (2_500.0, 4_210.5),
+    ]
+    .iter()
+    .map(|&(pipe_m, delivered_mwh)| Connection {
+        pipe_m,
+        delivered_mwh,
+        cop: None,
+        counterfactual: Counterfactual::Gas,
+    })
+    .collect();
+    let seasonal = 7_000.25f32;
+    let got = evaluate(&connections, seasonal, &e, hours);
+
+    // The pre-counterfactual formula, verbatim, in the same operation order.
+    let pipe_capex: f32 = connections
+        .iter()
+        .map(|c| c.pipe_m * e.pipe_cost_per_m)
+        .sum();
+    let gas_saved = seasonal * e.gas_price_per_mwh_th / e.boiler_eff;
+    let cooling_saved = seasonal * e.dc_avoided_cooling_per_mwh;
+    let expected_savings = gas_saved - 0.0 + cooling_saved;
+
+    assert_eq!(got.capex, pipe_capex);
+    assert_eq!(
+        got.annual_savings, expected_savings,
+        "must be bit-identical, not merely close"
+    );
+    assert_eq!(got.payback_yrs, Some(pipe_capex / expected_savings));
+}
+
+/// Displacing resistance heat is worth a full MWh of electricity; displacing a
+/// heat pump only what the pump would have drawn. In a place where electricity
+/// costs more than gas, resistance-heated buildings become the best sinks on
+/// the map — which is the whole reason the field exists.
+///
+/// Gas versus heat pump is *not* asserted either way: at a 3.6:1 electricity-
+/// to-gas price ratio a COP-3 pump costs slightly more per MWh of heat than a
+/// boiler, at 2:1 slightly less. That ordering is a finding about prices, not
+/// a property of the model.
+#[test]
+fn the_counterfactual_orders_avoided_cost_the_right_way() {
+    use heatmatch_core::econ::{avoided_cost, EXISTING_HEAT_PUMP_COP};
+    // California-like prices: electricity dear, gas cheap.
+    let mut e = Econ::default_for(Region::Nyc);
+    e.elec_price_per_mwh = 200.0;
+    e.gas_price_per_mwh_th = 55.0;
+
+    let gas = avoided_cost(100.0, Counterfactual::Gas, &e);
+    let resistance = avoided_cost(100.0, Counterfactual::ElectricResistance, &e);
+    let heat_pump = avoided_cost(100.0, Counterfactual::HeatPump, &e);
+
+    assert!(
+        resistance > gas,
+        "resistance {resistance} should beat gas {gas}"
+    );
+    // Always, whatever the prices: a pump with COP > 1 draws less than a
+    // resistance element delivering the same heat.
+    assert!(
+        resistance > heat_pump,
+        "resistance {resistance} should beat heat pump {heat_pump}"
+    );
+    assert_relative_eq!(resistance, 100.0 * 200.0);
+    assert_relative_eq!(gas, 100.0 * 55.0 / e.boiler_eff);
+    assert_relative_eq!(heat_pump, 100.0 * 200.0 / EXISTING_HEAT_PUMP_COP);
+}
+
+/// A mixed set is priced per allocation and scaled to the seasonal total.
+#[test]
+fn a_mixed_connection_set_is_priced_by_allocation() {
+    use heatmatch_core::econ::{evaluate, Connection};
+    let e = Econ::default_for(Region::Nyc);
+    let mk = |delivered_mwh: f32, counterfactual| Connection {
+        pipe_m: 0.0,
+        delivered_mwh,
+        cop: None,
+        counterfactual,
+    };
+    // 3:1 allocation between a gas sink and a resistance sink, no seasonal loss.
+    let connections = vec![
+        mk(300.0, Counterfactual::Gas),
+        mk(100.0, Counterfactual::ElectricResistance),
+    ];
+    let got = evaluate(&connections, 400.0, &e, 8760.0);
+
+    let gas_part = 300.0 * e.gas_price_per_mwh_th / e.boiler_eff;
+    let res_part = 100.0 * e.elec_price_per_mwh;
+    let expected = gas_part + res_part + 400.0 * e.dc_avoided_cooling_per_mwh;
+    assert_relative_eq!(got.annual_savings, expected, max_relative = 1e-6);
 }

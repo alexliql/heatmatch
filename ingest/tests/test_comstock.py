@@ -18,9 +18,13 @@ DERIVED = Path(__file__).resolve().parents[1] / "derived" / "va_intensity.json"
 
 # A minimal stand-in for the real table.
 TABLE = {
-    "MediumOffice": {"kwh_per_m2": 20.0, "monthly": [1 / 12] * 12},
-    "LargeOffice": {"kwh_per_m2": 10.0, "monthly": [1 / 12] * 12},
-    "PrimarySchool": {"kwh_per_m2": 80.0, "monthly": [1 / 12] * 12},
+    "MediumOffice": {"kwh_per_m2": 20.0, "monthly": [1 / 12] * 12, "counterfactual": "gas"},
+    "LargeOffice": {
+        "kwh_per_m2": 40.0,
+        "monthly": [1 / 12] * 12,
+        "counterfactual": "electric_resistance",
+    },
+    "PrimarySchool": {"kwh_per_m2": 80.0, "monthly": [1 / 12] * 12, "counterfactual": "gas"},
 }
 
 
@@ -100,16 +104,37 @@ def test_every_category_needing_a_profile_has_one(shipped: dict) -> None:
 def test_shipped_intensities_are_physically_plausible(shipped: dict) -> None:
     """Loose bounds: this catches a unit error, not a modelling disagreement.
 
-    The ceiling is generous because these are heating fuel only — a restaurant
-    burns a lot of gas per square metre — and the floor is zero-exclusive
-    because a type where nothing burns fuel would mean the columns moved.
+    Delivered heat, so the ceiling is generous — a restaurant delivers a lot of
+    heat per square metre — and the floor is zero-exclusive because a type
+    delivering nothing would mean the columns moved.
     """
     for name, entry in shipped["by_type"].items():
         kwh = entry["kwh_per_m2"]
-        assert 1.0 < kwh < 500.0, f"{name} at {kwh} kWh/m2 looks like a unit error"
+        assert 1.0 < kwh < 600.0, f"{name} at {kwh} kWh/m2 looks like a unit error"
         assert entry["samples"] >= 30, name
-        # Excluding electric heat can only lower the figure, never raise it.
-        assert entry["kwh_per_m2_incl_electric"] >= kwh, name
+        # Delivered heat includes everything fuel-only did and more, so it can
+        # never be the smaller figure.
+        assert kwh >= entry["kwh_per_m2_fuel_only"], name
+        assert entry["counterfactual"] in ("gas", "electric_resistance", "heat_pump"), name
+
+
+def test_shipped_table_records_its_basis(shipped: dict) -> None:
+    """The basis a number was computed on belongs in the file next to it."""
+    basis = shipped["basis"]
+    for key in ("quantity", "combustion", "electric_heating", "counterfactual", "monthly"):
+        assert basis[key], key
+    assert "delivered heat" in basis["quantity"]
+
+
+def test_office_intensity_in_4a_is_in_range(shipped: dict) -> None:
+    """Delivered-heat sanity for the one region shipped so far. The fuel-only
+    figure was 10 kWh/m2; delivered is roughly four times that, because half
+    the stock is resistance-heated and the fuel columns never saw it."""
+    if shipped["climate_zone"] != "4A":
+        pytest.skip("range is for climate zone 4A")
+    large = shipped["by_type"]["LargeOffice"]
+    assert 30.0 <= large["kwh_per_m2"] <= 150.0, large["kwh_per_m2"]
+    assert large["counterfactual"] == "electric_resistance"
 
 
 def test_winter_outweighs_summer_in_every_shipped_profile(shipped: dict) -> None:

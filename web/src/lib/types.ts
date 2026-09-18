@@ -8,6 +8,7 @@
 export type {
   CatWeights,
   Contribution,
+  Counterfactual,
   Decay,
   DistanceModel,
   Econ,
@@ -20,7 +21,7 @@ export type {
 } from "@/wasm/heatmatch_wasm";
 
 // Imported as well as re-exported: the label table below needs it in scope.
-import type { MwConfidence, Region } from "@/wasm/heatmatch_wasm";
+import type { Counterfactual, MwConfidence, Region } from "@/wasm/heatmatch_wasm";
 
 /** The regions the data covers, in display order. */
 export const REGIONS = ["nyc", "upstate", "nova"] as const;
@@ -56,6 +57,14 @@ export const CONFIDENCE_LABELS: Record<MwConfidence, string> = {
   filed: "Capacity stated in a county approval or utility filing",
   parcel_estimate: "Capacity estimated from assessed building area",
   footprint_estimate: "Capacity estimated from building footprint",
+};
+
+/** What a sink heats with today — and so what a connection would displace.
+ *  Short, because it sits on every row of the detail table. */
+export const COUNTERFACTUAL_LABELS: Record<Counterfactual, string> = {
+  gas: "displaces gas",
+  electric_resistance: "displaces electric heat",
+  heat_pump: "displaces a heat pump",
 };
 
 /** How a sink's annual demand was arrived at. Worth showing next to every

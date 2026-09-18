@@ -9,7 +9,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from ingest.config import MW_CONFIDENCE_BY_SOURCE, RegionName, SinkCat
+from ingest.config import MW_CONFIDENCE_BY_SOURCE, Counterfactual, RegionName, SinkCat
 
 # `pnnl` from §3.2 is deliberately absent: the Atlas publishes no capacity
 # field, so a MW value can never be sourced directly from it. Area-derived
@@ -94,8 +94,15 @@ class DataCenter(_Located):
 
 class Sink(_Located):
     cat: SinkCat
+    # Annual *delivered* heat, kWh — see config.BOILER_EFF for why not fuel.
     demand_kwh: float = Field(gt=0)
     demand_source: DemandSource
+    # Set when a measurement was overruled; the only value so far is
+    # "measured_fuel_near_zero".
+    demand_note: str | None = None
+    # What the building heats with today. Gas unless something says otherwise,
+    # so every New York sink prices exactly as it did before the field existed.
+    counterfactual: Counterfactual = "gas"
     # Floor or footprint area behind a modelled demand, when one is known.
     area_m2: float | None = Field(default=None, gt=0)
     area_source: AreaSource = "none"

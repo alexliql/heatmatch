@@ -181,5 +181,6 @@ def _summary(regions, dcs, sink_rows, stats) -> None:
     typer.echo(
         f"dropped: {stats['dropped_far']} too far, "
         f"{stats['dropped_steam_heated']} steam-heated | LL84 joined: {stats['ll84_joined']}"
+        f" | measurements overruled as near-zero: {stats['measured_fuel_near_zero']}"
     )
     typer.echo("")

@@ -104,7 +104,8 @@ proptest! {
         let near = Sink {
             id: "s_0".into(), name: "s".into(), region: Region::Nyc,
             lat: 40.7128 + frame_deg(100.0), lon: -74.0060,
-            cat: SinkCat::Pool, demand_kwh: 1_000_000.0, in_steam: false, in_uten: false,
+            cat: SinkCat::Pool, demand_kwh: 1_000_000.0, counterfactual: Default::default(),
+            in_steam: false, in_uten: false,
         };
         let mut far = near.clone();
         far.lat = 40.7128 + frame_deg(100.0 + extra_m);

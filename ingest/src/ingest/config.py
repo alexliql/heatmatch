@@ -35,6 +35,10 @@ REGIONS: dict[RegionName, dict] = {
         "pipe_cost_per_m": 3000.0,
         "state_fips": "36",
         "state_abb": "NY",
+        # The five boroughs. Not the clip — that stays the state boundary plus
+        # the bbox — but which ComStock counties the near-zero fallback reads.
+        "county_fips": ("061", "047", "081", "005", "085"),
+        "clip": "state",
     },
     "upstate": {
         "bbox": (-79.80, 40.45, -71.80, 45.05),
@@ -45,10 +49,11 @@ REGIONS: dict[RegionName, dict] = {
         "pipe_cost_per_m": 800.0,
         "state_fips": "36",
         "state_abb": "NY",
+        "clip": "state",
     },
-    # Northern Virginia. Clipped to seven named jurisdictions rather than to the
-    # bbox: the bbox reaches into Maryland and West Virginia, and the cluster
-    # this region exists to describe stops at the county line.
+    # Northern Virginia. Clipped to seven jurisdictions rather than to the bbox:
+    # the bbox reaches into Maryland and West Virginia, and the cluster this
+    # region exists to describe stops at the county line.
     "nova": {
         "bbox": (-78.00, 38.55, -77.00, 39.35),
         "origin": (39.02, -77.45),
@@ -58,18 +63,12 @@ REGIONS: dict[RegionName, dict] = {
         "pipe_cost_per_m": 1200.0,
         "state_fips": "51",
         "state_abb": "VA",
-        # TIGER's NAMELSAD, not NAME: "Fairfax" alone matches both Fairfax
-        # County and the independent City of Fairfax, which is a separate
-        # jurisdiction and not one of the seven.
-        "jurisdictions": (
-            "Loudoun County",
-            "Prince William County",
-            "Fairfax County",
-            "Arlington County",
-            "Alexandria city",
-            "Manassas city",
-            "Manassas Park city",
-        ),
+        # County FIPS, not names: "Fairfax" alone would match both Fairfax
+        # County (059) and the independent City of Fairfax (600), which is a
+        # separate jurisdiction and not one of the seven. Loudoun, Prince
+        # William, Fairfax, Arlington, Alexandria, Manassas, Manassas Park.
+        "county_fips": ("107", "153", "059", "013", "510", "683", "685"),
+        "clip": "counties",
         "climate_zone": "4A",
     },
 }
@@ -186,6 +185,37 @@ MAX_ESTIMATED_DC_MW: dict[str, float] = {"nyc": 25.0, "upstate": 25.0, "nova": 1
 # kBtu -> kWh.
 KBTU_TO_KWH = 0.293071
 
+# --- demand basis ---------------------------------------------------------
+# Every sink's `demand_kwh` is *delivered heat*: what the building's heating
+# system put into its spaces and hot water, not the fuel it bought to do so.
+# That is the quantity a heat network would replace, and it is what the engine
+# prices — `econ.rs` divides delivered heat by boiler efficiency to recover the
+# fuel avoided. A measured source reporting fuel input therefore has to be
+# scaled down by this on the way in, or the fuel is counted twice.
+#
+# Must equal `Econ::default_for(*).boiler_eff` in core/heatmatch-core; a test
+# reads the wasm default and checks.
+BOILER_EFF = 0.85
+
+# Heat delivered per unit of electricity by an existing heat pump, for turning
+# a ComStock building's heat-pump electricity back into the heat it produced.
+# Must equal `econ::EXISTING_HEAT_PUMP_COP`.
+EXISTING_HEAT_PUMP_COP = 3.0
+
+# What a sink heats with today. Decides what a connection would displace, and
+# so what a delivered MWh is worth to it. Derived per ComStock building type
+# from the weighted majority of `in.hvac_heat_type`; measured buildings whose
+# thermal fuels dominate are `gas` regardless.
+Counterfactual = Literal["gas", "electric_resistance", "heat_pump"]
+
+# A measured building reporting almost no thermal fuel is usually not a
+# building with no heating demand — it is one heated electrically, which the
+# fuel columns cannot see. Below the first threshold, where ComStock says a
+# typical building of that type wants more than the second, the measurement is
+# set aside for the model and the sink says so via `demand_note`.
+MEASURED_NEAR_ZERO_KWH_PER_M2 = 10.0
+MODELLED_SUBSTANTIAL_KWH_PER_M2 = 30.0
+
 # A sink is matched to a tax lot within this distance of its centroid (§3.3).
 LL84_JOIN_M = 40.0
 
@@ -259,6 +289,14 @@ COMSTOCK_SOURCE = {
 # Regions whose sink demand is modelled from ComStock rather than read from a
 # disclosure filing. New York has LL84; Virginia has nothing equivalent.
 COMSTOCK_REGIONS: frozenset[str] = frozenset({"nova"})
+
+# Regions that download a ComStock table at all. A superset of the above: New
+# York City fetches its five counties *only* so that the near-zero fallback
+# has something to compare a measured building against. Its footprint and
+# category estimates are never replaced — that would rewrite New York
+# wholesale, which is a different decision from catching a few all-electric
+# towers.
+COMSTOCK_FALLBACK_REGIONS: frozenset[str] = COMSTOCK_REGIONS | {"nyc"}
 
 # Below this many sampled buildings an intensity is not reported at all, and
 # the category constant is used instead. Pooled across a region's jurisdictions

@@ -1,13 +1,15 @@
-//! The New York results must not move.
+//! Shipped regions' results must not move.
 //!
 //! Adding a region changes ids and file hashes, so "byte-identical output" is
-//! not a testable claim. This is the claim that matters instead: for every New
-//! York data center, the physics and the economics come out exactly as they did
-//! before. If this fails, a change meant to be additive was not.
+//! not a testable claim. This is the claim that matters instead: for every
+//! data center in a region already shipped, the physics and the economics come
+//! out exactly as they did before. If this fails, a change meant to be additive
+//! was not — or it was meant to move numbers, in which case the fixture is
+//! regenerated and the commit says which numbers and why.
 //!
 //! Rows are keyed by name rather than id, because region-prefixed ids renumber.
 //! Regenerate deliberately, never reflexively:
-//! `cargo run --release --example ny_baseline -p heatmatch-core`
+//! `cargo run --release --example baseline -p heatmatch-core`
 
 use std::fs;
 use std::path::PathBuf;
@@ -51,9 +53,13 @@ fn number(v: &Value) -> Option<f32> {
     }
 }
 
+/// Regions the snapshot pins. Extended as regions ship; each addition is a
+/// deliberate regeneration of the fixture.
+const PINNED: [Region; 3] = [Region::Nyc, Region::Upstate, Region::Nova];
+
 fn baseline() -> Map<String, Value> {
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/ny_baseline.json");
-    serde_json::from_str(&fs::read_to_string(path).expect("ny_baseline.json")).unwrap()
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/baseline.json");
+    serde_json::from_str(&fs::read_to_string(path).expect("baseline.json")).unwrap()
 }
 
 fn sorted(mut rows: Vec<Row>) -> Vec<Row> {
@@ -69,7 +75,7 @@ fn sorted(mut rows: Vec<Row>) -> Vec<Row> {
 }
 
 #[test]
-fn new_york_results_are_unchanged() {
+fn shipped_regions_are_unchanged() {
     let dcs: Vec<DataCenter> = features("datacenters.")
         .iter()
         .map(|f| serde_json::from_value(Value::Object(flatten(f))).unwrap())
@@ -83,13 +89,17 @@ fn new_york_results_are_unchanged() {
     let engine = Engine::new(dcs, sinks, &[]).unwrap();
 
     let expected = baseline();
+    let mut failures: Vec<String> = Vec::new();
 
-    for region in [Region::Nyc, Region::Upstate] {
+    for region in PINNED {
+        let Some(rows) = expected.get(region.as_str()).and_then(Value::as_array) else {
+            failures.push(format!(
+                "{region:?}: not in the baseline (regenerate the fixture)"
+            ));
+            continue;
+        };
         let want: Vec<Row> = sorted(
-            expected[region.as_str()]
-                .as_array()
-                .expect("region in baseline")
-                .iter()
+            rows.iter()
                 .map(|r| {
                     (
                         r["name"].as_str().unwrap().to_string(),
@@ -135,19 +145,44 @@ fn new_york_results_are_unchanged() {
                 .collect(),
         );
 
-        assert_eq!(
-            got.len(),
-            want.len(),
-            "{region:?}: data center count changed"
-        );
-        for (g, w) in got.iter().zip(&want) {
-            assert_eq!(g.0, w.0, "{region:?}: rank order changed");
-            assert_eq!(
-                g.1, w.1,
-                "{region:?}: numbers changed for {} (score, supply, demand, util, \
-                 delivered, capex, savings, payback)",
-                g.0
-            );
+        // Every difference is collected before failing, per region, so a
+        // change that was meant to touch one region shows at a glance
+        // whether it touched the others.
+        if got.len() != want.len() {
+            failures.push(format!(
+                "{region:?}: data center count {} -> {}",
+                want.len(),
+                got.len()
+            ));
+            continue;
+        }
+        let moved: Vec<String> = got
+            .iter()
+            .zip(&want)
+            .filter_map(|(g, w)| {
+                if g.0 != w.0 {
+                    Some(format!("  order: expected {:?}, got {:?}", w.0, g.0))
+                } else if g.1 != w.1 {
+                    Some(format!("  {}: {:?} -> {:?}", g.0, w.1, g.1))
+                } else {
+                    None
+                }
+            })
+            .collect();
+        if !moved.is_empty() {
+            failures.push(format!(
+                "{region:?}: {} of {} sites moved (score, supply, demand, util, \
+                 delivered, capex, savings, payback)\n{}",
+                moved.len(),
+                got.len(),
+                moved.join("\n")
+            ));
         }
     }
+
+    assert!(
+        failures.is_empty(),
+        "results differ from the committed baseline:\n{}",
+        failures.join("\n")
+    );
 }
