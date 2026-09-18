@@ -31,50 +31,34 @@ def canonical(collection: dict) -> str:
     return json.dumps(collection, sort_keys=True, separators=(",", ":")) + "\n"
 
 
-def write_collection(name: str, models: list[BaseModel]) -> dict:
-    """Write data/<name>.<hash8>.geojson; return its manifest entry.
-
-    Any previous build of the same asset is removed, otherwise stale hashed
-    files accumulate and the web app cannot tell which one is current.
-    """
-    body = canonical({"type": "FeatureCollection", "features": [to_feature(m) for m in models]})
-    digest = hashlib.sha256(body.encode()).hexdigest()
-    DATA.mkdir(parents=True, exist_ok=True)
-    for old in DATA.glob(f"{name}.*.geojson"):
-        old.unlink()
-    path = DATA / f"{name}.{digest[:8]}.geojson"
-    path.write_text(body)
-    return {"file": path.name, "count": len(models), "hash": digest}
-
-
-def write_features(name: str, features: list[dict]) -> dict:
-    """Write an already-built feature list (water and zones, which are polygons
-    rather than model instances)."""
-    body = canonical({"type": "FeatureCollection", "features": features})
-    digest = hashlib.sha256(body.encode()).hexdigest()
-    DATA.mkdir(parents=True, exist_ok=True)
-    for old in DATA.glob(f"{name}.*.geojson"):
-        old.unlink()
-    path = DATA / f"{name}.{digest[:8]}.geojson"
-    path.write_text(body)
-    return {"file": path.name, "count": len(features), "hash": digest}
-
-
-def write_json(name: str, payload: dict) -> dict:
-    """Write data/<name>.<hash8>.json; return its manifest entry.
-
-    For assets that are not feature collections — the seasonal profile table is
-    the first. `count` is the number of top-level keys, which for profiles is
-    the number of regions that model their own shapes.
-    """
+def _write(name: str, ext: str, payload: dict, count: int) -> dict:
+    """Write data/<name>.<hash8>.<ext> and return its manifest entry. Any
+    previous build of the same asset is removed, or stale hashed files would
+    accumulate and the web app could not tell which is current."""
     body = canonical(payload)
     digest = hashlib.sha256(body.encode()).hexdigest()
     DATA.mkdir(parents=True, exist_ok=True)
-    for old in DATA.glob(f"{name}.*.json"):
+    for old in DATA.glob(f"{name}.*.{ext}"):
         old.unlink()
-    path = DATA / f"{name}.{digest[:8]}.json"
+    path = DATA / f"{name}.{digest[:8]}.{ext}"
     path.write_text(body)
-    return {"file": path.name, "count": len(payload), "hash": digest}
+    return {"file": path.name, "count": count, "hash": digest}
+
+
+def write_collection(name: str, models: list[BaseModel]) -> dict:
+    return write_features(name, [to_feature(m) for m in models])
+
+
+def write_features(name: str, features: list[dict]) -> dict:
+    """Water and zones arrive as polygon features rather than model instances."""
+    return _write(
+        name, "geojson", {"type": "FeatureCollection", "features": features}, len(features)
+    )
+
+
+def write_json(name: str, payload: dict) -> dict:
+    """A non-GeoJSON asset such as the profile table; `count` is its top-level keys."""
+    return _write(name, "json", payload, len(payload))
 
 
 def write_manifest(entries: dict[str, dict], sources: list[dict]) -> Path:
@@ -89,14 +73,8 @@ def write_manifest(entries: dict[str, dict], sources: list[dict]) -> Path:
 
 
 def assign_ids(rows: list[dict], prefix: str, width: int) -> list[tuple[str, dict]]:
-    """Number rows within their region, best-effort stable across releases.
-
-    Sorting on position-then-name is what makes ids reproducible: the
-    upstream file's row order is not guaranteed stable between releases. The
-    region goes in the id rather than in a single global counter so that adding
-    a region cannot renumber the ones already published — Virginia sorts south
-    of every New York site, and a global counter would have shifted all of them.
-    """
+    """Number rows within their region by position then name, so ids do not
+    depend on upstream row order and adding a region cannot renumber another."""
     rows.sort(key=lambda r: (r["region"], r["lat"], r["lon"], r["name"]))
     out: list[tuple[str, dict]] = []
     seen: dict[str, int] = {}

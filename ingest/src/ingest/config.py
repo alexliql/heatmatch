@@ -1,7 +1,4 @@
-"""Regions, source endpoints and estimation constants.
-
-Every magic number the pipeline uses lives here.
-"""
+"""Regions, source endpoints and estimation constants."""
 
 from typing import Literal
 
@@ -20,9 +17,11 @@ SinkCat = Literal[
 ]
 
 # --- regions -------------------------------------------------------
-# bbox is (min_lon, min_lat, max_lon, max_lat). A feature belongs to nyc if it
-# falls in the nyc bbox, else upstate; both are additionally clipped to the NYS
-# boundary, because the nyc bbox reaches well into New Jersey.
+# bbox is (min_lon, min_lat, max_lon, max_lat); `region_for` tests them in this
+# order, so nyc must precede the upstate bbox that contains it. Every region is
+# also clipped to a state or county boundary, since bboxes cross state lines.
+# `radius_m`, `detour`, `pipe_cost_per_m` and `origin` mirror the engine's
+# per-region defaults in core/heatmatch-core/src/weights.rs.
 REGIONS: dict[RegionName, dict] = {
     "nyc": {
         "bbox": (-74.30, 40.45, -73.65, 40.95),
@@ -33,8 +32,8 @@ REGIONS: dict[RegionName, dict] = {
         "pipe_cost_per_m": 3000.0,
         "state_fips": "36",
         "state_abb": "NY",
-        # The five boroughs. Not the clip — that stays the state boundary plus
-        # the bbox — but which ComStock counties the near-zero fallback reads.
+        # The five boroughs: which ComStock counties the near-zero fallback
+        # reads. The clip is still the state boundary.
         "county_fips": ("061", "047", "081", "005", "085"),
         "clip": "state",
     },
@@ -49,9 +48,8 @@ REGIONS: dict[RegionName, dict] = {
         "state_abb": "NY",
         "clip": "state",
     },
-    # Northern Virginia. Clipped to seven jurisdictions rather than to the bbox:
-    # the bbox reaches into Maryland and West Virginia, and the cluster this
-    # region exists to describe stops at the county line.
+    # Northern Virginia: seven jurisdictions, since the bbox reaches into
+    # Maryland and West Virginia.
     "nova": {
         "bbox": (-78.00, 38.55, -77.00, 39.35),
         "origin": (39.02, -77.45),
@@ -61,20 +59,15 @@ REGIONS: dict[RegionName, dict] = {
         "pipe_cost_per_m": 1200.0,
         "state_fips": "51",
         "state_abb": "VA",
-        # County FIPS, not names: "Fairfax" alone would match both Fairfax
-        # County (059) and the independent City of Fairfax (600), which is a
-        # separate jurisdiction and not one of the seven. Loudoun, Prince
-        # William, Fairfax, Arlington, Alexandria, Manassas, Manassas Park.
+        # FIPS, not names: "Fairfax" is both the county (059) and an
+        # independent city (600). Loudoun, Prince William, Fairfax, Arlington,
+        # Alexandria, Manassas, Manassas Park.
         "county_fips": ("107", "153", "059", "013", "510", "683", "685"),
         "clip": "counties",
         "climate_zone": "4A",
     },
-    # --- West Coast -------------------------------------------------------
-    # Seattle has the one thing no other region here has: a live precedent.
-    # The Westin Building already exports its heat to Amazon's campus next
-    # door, and Enwave runs district steam downtown. Its Enwave customers are
-    # kept as sinks even where steam heats them today — a network-level heat
-    # swap is exactly the case a data center next to a steam plant makes.
+    # Seattle keeps Enwave's steam-heated customers as sinks: a network-level
+    # heat swap is exactly the case a data center next to a steam plant makes.
     "seattle": {
         "bbox": (-122.55, 47.20, -121.95, 47.85),
         "origin": (47.61, -122.33),
@@ -89,8 +82,7 @@ REGIONS: dict[RegionName, dict] = {
         "climate_zone": "4C",
         "keep_steam_heated": True,
     },
-    # Portland metro. The data centers are in Hillsboro, in Washington County;
-    # Portland's own benchmarking data stops at the city limits.
+    # Portland metro; the data centers are in Hillsboro.
     "pdx": {
         "bbox": (-123.10, 45.30, -122.40, 45.75),
         "origin": (45.52, -122.90),
@@ -104,11 +96,8 @@ REGIONS: dict[RegionName, dict] = {
         "clip": "counties",
         "climate_zone": "4C",
     },
-    # California is modelled as metro regions, not one state: each gets its
-    # own projection frame, prices and water policy, and the Bay Area, Los
-    # Angeles and Sacramento are different utilities in different climates.
-    # San Diego and the Inland Empire are absent; each is a one-entry
-    # addition here if it ever earns one.
+    # California is three metro regions, not one state: different utilities,
+    # climates and projection frames.
     "svy": {
         "bbox": (-122.20, 37.20, -121.70, 37.50),
         "origin": (37.38, -121.95),
@@ -122,9 +111,7 @@ REGIONS: dict[RegionName, dict] = {
         "clip": "counties",
         "climate_zone": "3C",
     },
-    # The bbox reaches south-east to Irvine: Orange County is part of this
-    # region, and `region_for` tests the bbox before the county clip ever
-    # runs, so a bbox that stopped at the county line would drop it.
+    # The bbox reaches to Irvine so Orange County survives the bbox test.
     "la": {
         "bbox": (-118.60, 33.50, -117.55, 34.30),
         "origin": (34.05, -118.25),
@@ -138,8 +125,7 @@ REGIONS: dict[RegionName, dict] = {
         "clip": "counties",
         "climate_zone": "3B",
     },
-    # The inland control: the same measured-data source as the coast, real
-    # winters, and SMUD's municipal power at well under coastal prices.
+    # The inland control: coastal data sources, real winters, cheap SMUD power.
     "sac": {
         "bbox": (-121.65, 38.35, -121.05, 38.80),
         "origin": (38.58, -121.35),
@@ -158,9 +144,8 @@ REGIONS: dict[RegionName, dict] = {
 # --- sources --------------------------------------------------------------
 USER_AGENT = "heatmatch/0.1 (https://github.com/alexliql/heatmatch)"
 
-# The IM3 Open Source Data Center Atlas. Served from the project's GitHub repo
-# rather than its MSD-LIVE record: the record's file endpoint holds only a
-# placeholder, while the repo copy is versioned and directly fetchable.
+# The IM3 Open Source Data Center Atlas, from its GitHub repo: the MSD-LIVE
+# record's file endpoint holds only a placeholder.
 ATLAS_URL = (
     "https://raw.githubusercontent.com/IMMM-SFA/datacenter-atlas/main/"
     "static/im3_datacenter_centroids.geojson"
@@ -172,9 +157,8 @@ ATLAS_SOURCE = {
     "note": "IM3 Open Source Data Center Atlas v2026.02.09; derived from OpenStreetMap.",
 }
 
-# Full-resolution TIGER/Line, not the generalized cartographic file: the NY/NJ
-# line runs down the Hudson, and a generalized boundary misplaces waterfront
-# points onto the wrong side.
+# Full-resolution TIGER/Line: a generalized boundary misplaces Hudson
+# waterfront points onto the New Jersey side.
 NYS_BOUNDARY_URL = "https://www2.census.gov/geo/tiger/TIGER2024/STATE/tl_2024_us_state.zip"
 NYS_BOUNDARY_SOURCE = {
     "id": "census_tiger_state",
@@ -183,9 +167,7 @@ NYS_BOUNDARY_SOURCE = {
     "note": "US Census Bureau TIGER/Line 2024 state boundaries.",
 }
 
-# County and independent-city boundaries, for regions defined by jurisdiction
-# rather than by state. Virginia's independent cities (Alexandria, Manassas,
-# Manassas Park) are county-equivalents in TIGER and appear in this same file.
+# County and county-equivalent (Virginia's independent cities) boundaries.
 COUNTY_BOUNDARY_URL = "https://www2.census.gov/geo/tiger/TIGER2024/COUNTY/tl_2024_us_county.zip"
 COUNTY_BOUNDARY_SOURCE = {
     "id": "census_tiger_county",
@@ -195,9 +177,6 @@ COUNTY_BOUNDARY_SOURCE = {
 }
 
 # --- NYC Open Data (Socrata) ----------------------------------------------
-# Queried through the API with server-side filters rather than downloading the
-# full MapPLUTO shapefile, which is hundreds of megabytes of geometry this
-# pipeline never uses: PLUTO already carries a lot centroid.
 PLUTO_DATASET = "64uk-42ks"
 PLUTO_URL = f"https://data.cityofnewyork.us/resource/{PLUTO_DATASET}.json"
 PLUTO_SOURCE = {
@@ -216,15 +195,12 @@ LL84_SOURCE = {
     "note": "Energy and Water Data Disclosure for Local Law 84, calendar year 2021.",
 }
 
-# Building classes that could plausibly house a data center: E/F industrial and
+# Building classes that could house a data center: E/F industrial and
 # warehouse, I utility, Y public facility.
 PLUTO_BLDG_CLASS_PREFIXES = ("E", "F", "I", "Y")
 
-# Owner-name fragments for known colocation and carrier operators. Matched
-# case-insensitively as substrings; deliberately broad, then narrowed by the
-# building-class and address filters.
-# "COLO" alone was tried and removed: it matches Colonna, Colossal and similar
-# ordinary owner names. Only whole words or distinctive brands belong here.
+# Owner-name substrings for known operators, matched case-insensitively. Whole
+# words or distinctive brands only: "COLO" matched Colonna and Colossal.
 DC_OPERATOR_NAMES = (
     "EQUINIX",
     "DIGITAL REALTY",
@@ -284,12 +260,8 @@ DC_OPERATOR_NAMES = (
     "HURRICANE ELECTRIC",
 )
 
-# Carrier hotels, which are ordinary office building classes and so would be
-# missed by the class filter. 165 Halsey St is deliberately absent: it is in
-# Newark, New Jersey.
-# Addresses are PLUTO's spelling, which is not always the one on the door:
-# 60 Hudson Street is filed as "56 HUDSON STREET". Verified against the table
-# rather than assumed.
+# Carrier hotels sit in ordinary office classes and would miss the class
+# filter. Spelled as PLUTO files them: 60 Hudson Street is "56 HUDSON STREET".
 CARRIER_HOTEL_ADDRESSES = (
     "56 HUDSON STREET",  # 60 Hudson Street, the Western Union building
     "111 8 AVENUE",
@@ -301,20 +273,10 @@ CARRIER_HOTEL_ADDRESSES = (
     "33 WHITEHALL STREET",
 )
 
-# Ceiling on an area-derived capacity estimate, MW, per region.
-#
-# New York: the 75 W/sq ft figure assumes a whole building is white space,
-# which is false for the mixed-use towers this catches: 111 8th Avenue came out
-# at 162 MW, far more than any facility in the state and enough to dominate
-# every ranking on its own. Capping keeps a plausibly-large site large without
-# letting a floor-area artefact outrank real measurements.
-#
-# Northern Virginia needs a far higher ceiling, because there the inference is
-# sound: these are purpose-built halls, not offices with a server room, and the
-# largest genuinely are tens of megawatts. A 25 MW cap would clip most of the
-# cluster to the same value and flatten the ranking it exists to produce. At
-# the footprint density below nothing reaches 150 MW, so this ceiling is a
-# guard against bad geometry rather than a routine correction.
+# Ceiling on an area-derived capacity estimate, MW. New York's mixed-use
+# towers are not all white space (111 8th Avenue came out at 162 MW); the
+# purpose-built halls elsewhere genuinely reach tens of MW, so their ceiling
+# only guards against bad geometry.
 MAX_ESTIMATED_DC_MW: dict[str, float] = {
     "nyc": 25.0,
     "upstate": 25.0,
@@ -330,33 +292,20 @@ MAX_ESTIMATED_DC_MW: dict[str, float] = {
 KBTU_TO_KWH = 0.293071
 
 # --- demand basis ---------------------------------------------------------
-# Every sink's `demand_kwh` is *delivered heat*: what the building's heating
-# system put into its spaces and hot water, not the fuel it bought to do so.
-# That is the quantity a heat network would replace, and it is what the engine
-# prices — `econ.rs` divides delivered heat by boiler efficiency to recover the
-# fuel avoided. A measured source reporting fuel input therefore has to be
-# scaled down by this on the way in, or the fuel is counted twice.
-#
-# Must equal `Econ::default_for(*).boiler_eff` in core/heatmatch-core; a test
-# reads the wasm default and checks.
+# Every sink's `demand_kwh` is *delivered heat*, not fuel bought: the engine
+# divides by boiler efficiency itself, so fuel-reporting sources are scaled by
+# this on the way in. Both constants must equal the engine's (`boiler_eff`,
+# `econ::EXISTING_HEAT_PUMP_COP`); tests check.
 BOILER_EFF = 0.85
-
-# Heat delivered per unit of electricity by an existing heat pump, for turning
-# a ComStock building's heat-pump electricity back into the heat it produced.
-# Must equal `econ::EXISTING_HEAT_PUMP_COP`.
 EXISTING_HEAT_PUMP_COP = 3.0
 
-# What a sink heats with today. Decides what a connection would displace, and
-# so what a delivered MWh is worth to it. Derived per ComStock building type
-# from the weighted majority of `in.hvac_heat_type`; measured buildings whose
-# thermal fuels dominate are `gas` regardless.
+# What a sink heats with today, and so what a connection would displace.
 Counterfactual = Literal["gas", "electric_resistance", "heat_pump"]
 
-# A measured building reporting almost no thermal fuel is usually not a
-# building with no heating demand — it is one heated electrically, which the
-# fuel columns cannot see. Below the first threshold, where ComStock says a
-# typical building of that type wants more than the second, the measurement is
-# set aside for the model and the sink says so via `demand_note`.
+# A measured building reporting almost no thermal fuel is usually heated
+# electrically, which the fuel columns cannot see. Below the first threshold,
+# where ComStock says its type wants more than the second, the model wins and
+# the sink says so via `demand_note`.
 MEASURED_NEAR_ZERO_KWH_PER_M2 = 10.0
 MODELLED_SUBSTANTIAL_KWH_PER_M2 = 30.0
 
@@ -373,8 +322,7 @@ OVERPASS_SOURCE = {
     "note": "© OpenStreetMap contributors, via the Overpass API.",
 }
 
-# Tag filters per sink category. Each entry is a list of Overpass tag
-# selectors; every selector is queried across node, way and relation.
+# Overpass tag selectors per sink category.
 OVERPASS_FILTERS: dict[SinkCat, list[str]] = {
     "pool": [
         '["leisure"="swimming_pool"]["access"!="private"]',
@@ -391,29 +339,18 @@ OVERPASS_FILTERS: dict[SinkCat, list[str]] = {
     "hotel": ['["tourism"="hotel"]'],
 }
 
-# Where apartment buildings are collected as sinks. Dense enough to matter in
-# New York City and Los Angeles; elsewhere the category is mostly suburban
-# garden apartments with little to gain from a heat network.
+# Where apartment buildings are dense enough to collect as sinks.
 MULTIFAMILY_REGIONS: frozenset[str] = frozenset({"nyc", "la"})
 
 
 def keep_steam_heated(region: str) -> bool:
-    """Whether steam-heated sinks stay in the dataset.
-
-    Dropped everywhere by default — a district-steam building already has its
-    heat. Seattle keeps them: Enwave's customers are the natural offtakers of a
-    network-level swap, which is a commercial question this model does not
-    evaluate but should not pre-empt.
-    """
+    """Steam-heated sinks are dropped (they have their heat) unless the region
+    keeps them as offtakers of a network-level swap."""
     return bool(REGIONS[region].get("keep_steam_heated", False))
 
 
-# How far to trust a capacity figure, given where it came from. Kept here, in
-# one mapping, so `mw_source` and `mw_confidence` can never contradict each
-# other: the second is derived from the first, never set independently.
-#
-# Everything New York has is area-derived, which is why the engine's New York
-# defaults apply no discount at all — grading guesses against guesses is noise.
+# `mw_confidence` is derived from `mw_source` through this, never set
+# independently, so the two cannot disagree.
 MW_CONFIDENCE_BY_SOURCE: dict[str, str] = {
     "reported": "reported",
     "filed": "filed",
@@ -427,11 +364,8 @@ MW_CONFIDENCE_BY_SOURCE: dict[str, str] = {
 
 
 # --- NREL ComStock --------------------------------------------------------
-# Modelled thermal demand, for regions with no benchmarking disclosure to read.
-#
-# Release pinned deliberately: ComStock re-runs the whole stock each year and
-# the intensities move, so an unpinned "latest" would silently change every
-# Virginia demand figure between builds. Bump it on purpose, and rerun.
+# Modelled thermal demand where there is no benchmarking disclosure. The
+# release is pinned: intensities move between releases.
 COMSTOCK_RELEASE = "2025/comstock_amy2018_release_3"
 COMSTOCK_BASE_URL = (
     "https://oedi-data-lake.s3.amazonaws.com/nrel-pds-building-stock/"
@@ -447,29 +381,17 @@ COMSTOCK_SOURCE = {
     ),
 }
 
-# Regions whose sink demand is modelled from ComStock rather than read from a
-# disclosure filing. New York has LL84; Virginia has nothing equivalent.
+# Regions whose sink demand is modelled from ComStock. New York City reads its
+# table only for the near-zero fallback; its estimates are never replaced.
 COMSTOCK_REGIONS: frozenset[str] = frozenset({"nova", "seattle", "pdx", "svy", "la", "sac"})
-
-# Regions that download a ComStock table at all. A superset of the above: New
-# York City fetches its five counties *only* so that the near-zero fallback
-# has something to compare a measured building against. Its footprint and
-# category estimates are never replaced — that would rewrite New York
-# wholesale, which is a different decision from catching a few all-electric
-# towers.
 COMSTOCK_FALLBACK_REGIONS: frozenset[str] = COMSTOCK_REGIONS | {"nyc"}
 
-# Below this many sampled buildings an intensity is not reported at all, and
-# the category constant is used instead. Pooled across a region's jurisdictions
-# this is rarely close: Loudoun alone samples ~6,300 buildings.
+# Fewer sampled buildings than this and the category constant is used instead.
 COMSTOCK_MIN_SAMPLES = 30
 
-# ComStock building type per sink category. Categories absent from this map
-# have no ComStock equivalent — a pool, greenhouse, brewery or treatment works
-# is not commercial floor space — and keep INTENSITY_KWH_PER_M2 below.
-#
-# `office` is resolved by area at use time, not here: ComStock separates small,
-# medium and large offices and they differ substantially.
+# ComStock building type per sink category. Absent categories (pool,
+# greenhouse, brewery, wwtp) keep INTENSITY_KWH_PER_M2; `office` is resolved
+# by floor area in `comstock.comstock_type`.
 COMSTOCK_TYPE_BY_CAT: dict[str, str] = {
     "hospital": "Hospital",
     "hotel": "LargeHotel",
@@ -480,15 +402,9 @@ COMSTOCK_TYPE_BY_CAT: dict[str, str] = {
 # Floor area above which an office is modelled as a large one, m2.
 COMSTOCK_LARGE_OFFICE_M2 = 10_000.0
 
-# Which ComStock type supplies the *monthly shape* for a category. Intensity is
-# chosen per building (an office's size decides it); a profile is one curve per
-# category, so offices take the medium-office shape — the large and medium
-# curves differ by about a point a month, and most qualifying office sinks sit
-# nearer the medium end of the range.
-#
-# `hospital` is absent on purpose: ComStock samples only six hospitals across
-# the seven jurisdictions, below COMSTOCK_MIN_SAMPLES, so hospitals keep the
-# built-in shape and the category demand constant.
+# Which ComStock type supplies a category's monthly shape. One curve per
+# category, so offices take the medium-office shape. `hospital` is absent:
+# too few samples, so it keeps the engine's built-in shape.
 COMSTOCK_PROFILE_TYPE_BY_CAT: dict[str, str] = {
     "school": "PrimarySchool",
     "university": "SecondarySchool",
@@ -497,30 +413,18 @@ COMSTOCK_PROFILE_TYPE_BY_CAT: dict[str, str] = {
 }
 
 # --- data center capacity estimation --------------------------------------
-# The Atlas carries no capacity field, so MW is always an estimate here.
-# 75 W/sq ft is a low colo density.
+# W/sq ft: 75 for mixed-use colo space (New York), 150 for a purpose-built
+# hall's assessed floor area, 100 against a bare footprint, which overstates
+# how much ground area is white space.
 MW_PER_SQFT = 0.000075
-
-# Northern Virginia's purpose-built halls are far denser than the mixed-use
-# colo space the NYC figure describes: 150 W/sq ft against assessed floor area.
 NOVA_MW_PER_SQFT = 0.00015
-
-# Applied when only a building *footprint* is known, as in the Atlas, whose
-# `sqft` is an OpenStreetMap polygon area. A footprint understates a two-storey
-# hall but overstates how much of the ground area is white space rather than
-# mechanical yard, loading and office; the two errors do not cancel, so the
-# lower figure is the honest one. Across the seven jurisdictions it totals
-# ~4 GW, which is the right order for the cluster; 150 W/sq ft would say 6 GW.
 NOVA_MW_PER_SQFT_FOOTPRINT = 0.0001
 
-# Area-derived capacity density per region, W/sq ft of the area that source
-# actually reports.
+# Density per region, against the area that region's source reports.
 MW_PER_SQFT_BY_REGION: dict[str, float] = {
     "nyc": MW_PER_SQFT,
     "upstate": MW_PER_SQFT,
     "nova": NOVA_MW_PER_SQFT_FOOTPRINT,
-    # Purpose-built halls, same as Virginia. A downtown carrier hotel is the
-    # exception and is seeded with its own density; see seed_dcs.py.
     "seattle": NOVA_MW_PER_SQFT_FOOTPRINT,
     "pdx": NOVA_MW_PER_SQFT_FOOTPRINT,
     "svy": NOVA_MW_PER_SQFT_FOOTPRINT,
@@ -528,9 +432,8 @@ MW_PER_SQFT_BY_REGION: dict[str, float] = {
     "sac": NOVA_MW_PER_SQFT_FOOTPRINT,
 }
 
-# Seeded sites: W per square foot of stated floor area, by what kind of
-# building it is. A purpose-built hall is mostly white space; a downtown
-# carrier hotel is an office tower with some floors of it.
+# Seeded sites, by kind of building: a carrier hotel is an office tower with
+# some floors of white space.
 SEED_MW_PER_SQFT: dict[str, float] = {
     "purpose_built": NOVA_MW_PER_SQFT,
     "carrier_hotel": MW_PER_SQFT,
@@ -544,9 +447,8 @@ CAMPUS_ADJACENCY_M = 30.0
 # its buildings cover at least this much ground.
 NOVA_MIN_DC_FOOTPRINT_M2 = 4000.0
 
-# Fallback when the Atlas has no footprint (its `type=point` rows). 1.5 MW is a
-# deliberately modest single-facility figure: guessing high would let unmeasured
-# sites dominate the ranking, which is the opposite of what the score is for.
+# Fallback when the Atlas has no footprint; modest so unmeasured sites cannot
+# dominate the ranking.
 DEFAULT_DC_MW = 1.5
 
 # --- sink demand estimation -----------------------------------------------
@@ -564,8 +466,7 @@ INTENSITY_KWH_PER_M2: dict[SinkCat, float] = {
     "hotel": 180.0,
 }
 
-# Used when OSM has no `building:levels`. Single-storey for the process/covered
-# categories, mid-rise for the rest; these are guesses and flagged as such.
+# Storeys when OSM has no `building:levels`.
 FLOORS_GUESS: dict[SinkCat, float] = {
     "pool": 1.0,
     "hospital": 5.0,
@@ -587,23 +488,10 @@ MIN_AREA_M2: dict[SinkCat, float] = {
     "residential_multifamily": 2000.0,
 }
 
-# Per-region overrides, merged over MIN_AREA_M2.
-#
-# Northern Virginia gates pools at 250 m². Suburban OpenStreetMap coverage
-# there is thorough enough to include back-garden pools: 544 of 588 matches
-# were unnamed with a median area of 81 m², which is a domestic pool, while the
-# named community pools start around 330 m². Pool carries the highest category
-# weight in the model, so without this gate the Virginia ranking is decided by
-# back gardens.
-#
-# The same gate is *not* applied to New York, where the identical problem
-# exists (76% of NYC pool matches are under 250 m², median 21 m²) — fixing it
-# there would move published New York results, which is a separate decision.
-# See the README's known limitations.
-#
-# Every region added since gets it: suburban Washington, Oregon and California
-# are mapped the same way, and the first Silicon Valley ranking put 41 m² and
-# 69 m² "pools" among the top contributions.
+# Every region after New York gates pools at 250 m²: suburban OpenStreetMap
+# includes back-garden pools (median 81 m² in Virginia), and pool carries the
+# highest category weight. New York has the same problem, but applying the
+# gate there would move published results; see the README's limitations.
 _POOL_GATED = {**MIN_AREA_M2, "pool": 250.0}
 MIN_AREA_M2_BY_REGION: dict[str, dict[SinkCat, float]] = {
     region: _POOL_GATED for region in ("nova", "seattle", "pdx", "svy", "la", "sac")
@@ -615,8 +503,8 @@ def min_area_for(region: str) -> dict[SinkCat, float]:
     return MIN_AREA_M2_BY_REGION.get(region, MIN_AREA_M2)
 
 
-# Annual thermal demand (kWh) for nodes, which have no footprint at all.
-# Order-of-magnitude placeholders, flagged via demand_source="category_default".
+# Annual demand (kWh) for nodes, which have no footprint; order-of-magnitude
+# placeholders flagged as demand_source="category_default".
 CATEGORY_DEFAULT_KWH: dict[SinkCat, float] = {
     "pool": 500_000.0,
     "hospital": 8_000_000.0,
@@ -630,9 +518,8 @@ CATEGORY_DEFAULT_KWH: dict[SinkCat, float] = {
     "hotel": 1_500_000.0,
 }
 
-# Sinks are kept only if within this multiple of a region's radius of some data
-# center; the 1.1 is slack so a later radius tweak in the UI does not
-# immediately run out of data.
+# Sinks are kept within radius × detour × this of some data center; the slack
+# is so a radius tweak in the UI does not immediately run out of data.
 SINK_PREFILTER_SLACK = 1.1
 
 
@@ -642,16 +529,9 @@ def in_bbox(lat: float, lon: float, bbox: tuple[float, float, float, float]) -> 
 
 
 def region_for(lat: float, lon: float) -> RegionName | None:
-    """Assign a point to a region, or None if it is in neither.
-
-    Order matters and is not arbitrary: the upstate bbox fully contains the nyc
-    one, so nyc must be tested first for "upstate = the rest of NYS" to
-    hold. No other bbox overlaps any other, so their order is free. Callers
-    still need the boundary check separately; these are bounding boxes, and
-    the nyc one reaches into New Jersey, the nova one into Maryland and West
-    Virginia, and the West Coast ones across county lines.
-    """
-    for name in ("nyc", "upstate", "nova", "seattle", "pdx", "svy", "la", "sac"):
-        if in_bbox(lat, lon, REGIONS[name]["bbox"]):
-            return name  # type: ignore[return-value]
+    """The region whose bbox contains the point, in REGIONS order, or None.
+    A bbox test only; `boundary.in_region` adds the clip."""
+    for name, cfg in REGIONS.items():
+        if in_bbox(lat, lon, cfg["bbox"]):
+            return name
     return None

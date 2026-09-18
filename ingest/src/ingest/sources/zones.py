@@ -1,27 +1,18 @@
-"""Steam-territory and thermal-network polygons.
-
-Both come from hand-maintained GeoJSON in `ingest/manual/`, because neither is
-published as geodata. They are approximations and say so in their own
-properties; the README lists them among the known limitations.
-"""
+"""Steam-territory and thermal-network polygons: hand-drawn GeoJSON in
+`ingest/manual/`, since neither is published as geodata."""
 
 import json
 from functools import lru_cache
-from pathlib import Path
 
 from shapely.geometry import Point, shape
+from shapely.ops import unary_union
 from shapely.prepared import prep
 
-MANUAL = Path(__file__).resolve().parents[3] / "manual"
+from ingest.util import MANUAL
 
-# Every manual zone layer, with the `kind` the map styles it by. One list, here,
-# so that tagging a sink `in_steam` and drawing the territory on the map can
-# never disagree about which files count. A region with no district heating
-# still ships a file, empty, so its absence is a statement rather than an
-# oversight.
-#
-# "steam" and "uten" are the kinds the engine reads; anything else is drawn
-# but has no effect on scoring.
+# Every manual zone layer with its `kind`; one list so tagging and drawing
+# cannot disagree. "steam" and "uten" affect scoring; the rest are only drawn.
+# A region with no district heating still ships an empty file.
 ZONE_FILES: tuple[tuple[str, str], ...] = (
     ("steam_territory.geojson", "steam"),  # Con Edison, Manhattan
     ("uten_pilots.geojson", "uten"),
@@ -46,11 +37,7 @@ def _geoms(name: str) -> list:
 def _zone_of_kind(kind: str):
     """The union of every zone file of one kind, prepared for point tests."""
     geoms = [g for name, k in ZONE_FILES if k == kind for g in _geoms(name)]
-    if not geoms:
-        return None
-    from shapely.ops import unary_union
-
-    return prep(unary_union(geoms))
+    return prep(unary_union(geoms)) if geoms else None
 
 
 def in_steam(lat: float, lon: float) -> bool:

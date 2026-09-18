@@ -3,7 +3,7 @@
 import pytest
 
 from ingest.config import MAX_ESTIMATED_DC_MW, MW_PER_SQFT, NOVA_MW_PER_SQFT
-from ingest.sources import seed_dcs
+from ingest.sources import boundary, seed_dcs
 
 
 @pytest.fixture
@@ -17,7 +17,7 @@ def seeds(monkeypatch):
 @pytest.fixture(autouse=True)
 def _inside_region(monkeypatch):
     # The clip needs TIGER; tests never fetch. Everything is "inside".
-    monkeypatch.setattr(seed_dcs, "in_region_boundary", lambda lat, lon, region: True)
+    monkeypatch.setattr(boundary, "in_region_boundary", lambda lat, lon, region: True)
 
 
 def _row(**kw) -> dict:

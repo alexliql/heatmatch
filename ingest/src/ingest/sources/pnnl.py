@@ -1,14 +1,7 @@
-"""Data centers from the IM3 Open Source Data Center Atlas.
-
-Published by PNNL's IM3 project via MSD-LIVE, hence the module name.
-
-Two things, both verified against the published data: the Atlas carries no capacity field (so MW is always estimated from
-footprint area), and it is itself derived from OpenStreetMap under ODbL.
-
-`sqft` is an OpenStreetMap building polygon — a footprint, not floor area —
-which is why the density applied to it is per-region and, for Virginia, the
-lower of the two figures in `config`.
-"""
+"""Data centers from the IM3 Open Source Data Center Atlas (PNNL, hence the
+module name). It carries no capacity field, and its `sqft` is an
+OpenStreetMap footprint, not floor area, so MW is estimated at the
+per-region footprint density."""
 
 import json
 from collections.abc import Iterator
@@ -21,9 +14,8 @@ from ingest.config import (
     MW_PER_SQFT_BY_REGION,
     REGIONS,
     RegionName,
-    region_for,
 )
-from ingest.sources.boundary import in_region_boundary
+from ingest.sources.boundary import in_region
 from ingest.sources.fetch import cached_get
 
 
@@ -37,11 +29,8 @@ def _name_of(props: dict) -> str:
 
 
 def candidates(region: RegionName, *, refresh: bool = False) -> Iterator[dict]:
-    """Yield raw data center candidates for `region`.
-
-    Candidates are dicts, not schema objects: ids are assigned later, once the
-    full set is known and can be sorted into a stable order.
-    """
+    """Raw candidates for `region`; ids are assigned later, once the full set
+    can be sorted into a stable order."""
     path = cached_get(ATLAS_URL, "im3_datacenter_centroids.geojson", refresh=refresh)
     features = json.loads(path.read_text())["features"]
 
@@ -57,7 +46,7 @@ def candidates(region: RegionName, *, refresh: bool = False) -> Iterator[dict]:
         if geom.get("type") != "Point":
             continue
         lon, lat = (float(c) for c in geom["coordinates"][:2])
-        if region_for(lat, lon) != region or not in_region_boundary(lat, lon, region):
+        if not in_region(lat, lon, region):
             continue
 
         sqft = props.get("sqft")
@@ -74,6 +63,6 @@ def candidates(region: RegionName, *, refresh: bool = False) -> Iterator[dict]:
             "lon": lon,
             "mw": mw,
             "mw_source": mw_source,
-            "cooling": "unknown",  # no source in this phase carries cooling type
+            "cooling": "unknown",
             "sources": [ATLAS_SOURCE["id"]],
         }

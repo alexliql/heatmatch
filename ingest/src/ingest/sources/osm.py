@@ -1,22 +1,10 @@
-"""Heat sinks from OpenStreetMap via the Overpass API.
-
-Two details that are easy to get wrong and were verified against the live API:
-the service returns 406 for a default requests/curl User-Agent, and `out geom`
-is required rather than `out center` because the area gates and the footprint
-demand estimate both need the polygon, not just its centre.
-
-Queries are anchored on the data centers rather than on the region bbox. A bbox
-query over NYC returned ~4400 sinks of which the pre-filter kept ~160, and the
-same query over upstate — the rest of the state — did not return at all.
-Overpass takes a list of coordinates in one `around` clause, so the whole
-region costs one query per category regardless of how many sites it has.
-"""
+"""Heat sinks from OpenStreetMap via the Overpass API, queried around the
+data centers rather than over the region bbox: a bbox query over NYC returned
+~4400 sinks of which the pre-filter kept ~160, and over upstate it timed out.
+Overpass returns 406 for a default User-Agent."""
 
 import json
 from collections.abc import Iterator, Sequence
-
-from pyproj import Geod
-from shapely.geometry import Polygon
 
 from ingest.config import (
     CATEGORY_DEFAULT_KWH,
@@ -27,21 +15,17 @@ from ingest.config import (
     OVERPASS_FILTERS,
     OVERPASS_MAX_RETRIES,
     OVERPASS_SOURCE,
-    OVERPASS_TIMEOUT_S,
     OVERPASS_URL,
     RegionName,
     SinkCat,
     min_area_for,
-    region_for,
 )
-from ingest.sources.boundary import in_region_boundary
-from ingest.sources.fetch import cached_post
+from ingest.sources.boundary import in_region
+from ingest.sources.fetch import cached_post, overpass_ql
+from ingest.util import GEOD, distance_m, ring_polygon
 
-_GEOD = Geod(ellps="WGS84")
-
-# Two OSM elements of the same category closer than this are treated as one
-# building tagged twice (commonly a node inside its own way). Without this the
-# same demand is counted more than once, which feeds straight into the score.
+# Same-category elements closer than this are one building tagged twice
+# (commonly a node inside its own way).
 _DEDUPE_M = 50.0
 
 
@@ -51,26 +35,12 @@ def _query(
     radius_m: float,
     gates: dict[SinkCat, float] | None = None,
 ) -> str:
-    """Build Overpass QL anchored on the data centers.
-
-    `around` accepts a flat list of lat,lon pairs, so one clause covers every
-    site in the region.
-
-    Area-gated categories skip nodes entirely. A node has no footprint and so
-    can never clear its gate, and for a selector as broad as `["office"]` the
-    discarded nodes dominate the response — querying them turns a fast request
-    into one that does not return.
-
-    `gates` is the region's area gates, which decide which categories those
-    are; it defaults to the shared table so existing callers and the tests read
-    unchanged.
-    """
+    """Overpass QL for one category. Area-gated categories skip nodes: a node
+    has no footprint to clear the gate, and for `["office"]` the discarded
+    nodes would dominate the response."""
     gates = gates if gates is not None else MIN_AREA_M2
-    coords = ",".join(f"{lat:.6f},{lon:.6f}" for lat, lon in anchors)
-    around = f"(around:{radius_m:.0f},{coords})"
     kinds = ("way", "relation") if cat in gates else ("node", "way", "relation")
-    parts = [f"{kind}{sel}{around};" for sel in OVERPASS_FILTERS[cat] for kind in kinds]
-    return f"[out:json][timeout:{OVERPASS_TIMEOUT_S}];(" + "".join(parts) + ");out geom tags;"
+    return overpass_ql(OVERPASS_FILTERS[cat], kinds, anchors, radius_m)
 
 
 def _ring_area_m2(ring: list[dict]) -> float:
@@ -79,7 +49,7 @@ def _ring_area_m2(ring: list[dict]) -> float:
         return 0.0
     lons = [p["lon"] for p in ring]
     lats = [p["lat"] for p in ring]
-    area, _ = _GEOD.polygon_area_perimeter(lons, lats)
+    area, _ = GEOD.polygon_area_perimeter(lons, lats)
     return abs(area)
 
 
@@ -90,27 +60,19 @@ def _footprint(el: dict) -> tuple[float | None, float, float] | None:
 
     if el["type"] == "way":
         ring = el.get("geometry") or []
-        if len(ring) < 3:
+        poly = ring_polygon(ring)
+        if poly is None:
             return None
-        poly = Polygon([(p["lon"], p["lat"]) for p in ring])
-        if not poly.is_valid:
-            poly = poly.buffer(0)
-        if poly.is_empty:
-            return None
-        c = poly.centroid
-        return _ring_area_m2(ring), c.y, c.x
+        return _ring_area_m2(ring), poly.centroid.y, poly.centroid.x
 
-    # Relations: sum the outer rings only. Inner rings (courtyards) are ignored
-    # rather than subtracted — they are rare here and the demand estimate is
-    # already an approximation.
+    # Relations: sum the outer rings; courtyards are rare and ignored.
     outers = [m.get("geometry") or [] for m in el.get("members", []) if m.get("role") != "inner"]
     outers = [r for r in outers if len(r) >= 3]
     if not outers:
         return None
     area = sum(_ring_area_m2(r) for r in outers)
-    biggest = max(outers, key=_ring_area_m2)
-    poly = Polygon([(p["lon"], p["lat"]) for p in biggest]).buffer(0)
-    if poly.is_empty:
+    poly = ring_polygon(max(outers, key=_ring_area_m2))
+    if poly is None:
         return None
     return area, poly.centroid.y, poly.centroid.x
 
@@ -140,8 +102,7 @@ def _dedupe(rows: list[dict]) -> list[dict]:
         for k in kept:
             if k["cat"] != row["cat"]:
                 continue
-            _, _, dist = _GEOD.inv(k["lon"], k["lat"], row["lon"], row["lat"])
-            if dist < _DEDUPE_M:
+            if distance_m(k["lat"], k["lon"], row["lat"], row["lon"]) < _DEDUPE_M:
                 dup = True
                 break
         if not dup:
@@ -179,12 +140,10 @@ def candidates(
                 continue
             area_m2, lat, lon = place
 
-            # A gated category is defined on footprint area, so an element with
-            # no footprint (a bare node) cannot qualify.
             gate = gates.get(cat)
             if gate is not None and (area_m2 is None or area_m2 < gate):
                 continue
-            if region_for(lat, lon) != region or not in_region_boundary(lat, lon, region):
+            if not in_region(lat, lon, region):
                 continue
 
             tags = el.get("tags") or {}
@@ -199,11 +158,7 @@ def candidates(
                     "cat": cat,
                     "demand_kwh": demand_kwh,
                     "demand_source": demand_source,
-                    # Carried so a region with a demand model can use it; the
-                    # footprint estimate above already has. `area_m2` is the
-                    # ground footprint OpenStreetMap draws; a per-floor
-                    # intensity wants the floor area, which is floors times
-                    # that — for a downtown tower, thirty times that.
+                    # Footprint and floor area, for regions with a demand model.
                     "area_m2": area_m2,
                     "area_source": "osm" if area_m2 else "none",
                     "floor_area_m2": area_m2 * floors if area_m2 else None,

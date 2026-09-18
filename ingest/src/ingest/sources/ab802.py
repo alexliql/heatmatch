@@ -1,20 +1,7 @@
-"""Measured heating demand from California's AB 802 benchmarking disclosure.
-
-Assembly Bill 802 requires every commercial and multifamily building of
-50,000 sq ft and up, statewide, to report annual energy use to the California
-Energy Commission, which publishes it. One file covers the whole state, so one
-module serves every California region; each is filtered to its own clip.
-
-The published workbook carries fuels as separate fields — natural gas, fuel
-oil, propane, district steam and district hot water, all in kBtu — and a
-geocoded coordinate per building, so nothing has to be derived from an EUI and
-no tax-lot join is needed. That was the open question when this was planned;
-the answer is in the column list below.
-
-The download is an ADA-formatted xlsx behind a dated path that changes with
-each release. It is pinned here on purpose: a moved file is a build failure
-to look at, not a silently different year.
-"""
+"""California's AB 802 benchmarking disclosure (buildings >= 50,000 sq ft,
+statewide). The workbook carries fuels as separate kBtu fields and a geocode
+per building. Its dated URL is pinned: a moved file is a build failure to
+look at, not a silently different year."""
 
 import math
 from functools import lru_cache
@@ -38,13 +25,10 @@ AB802_SOURCE = {
     ),
 }
 
-# Column headings as the workbook prints them. The header row is the third
-# row; the first is a title and the second is blank.
+# The header is the third row; the first is a title and the second is blank.
 HEADER_ROW = 2
 LAT, LON = "Latitude", "Longitude"
 FUEL_COLUMNS = ("Natural Gas Use (kBtu)", "Fuel Oil #2 Use (kBtu)", "Propane Use (kBtu)")
-# Both are heat that arrives already made; either dominating means the
-# building has its heat.
 DISTRICT_COLUMNS = ("District Steam Use (kBtu)", "District Hot Water Use (kBtu)")
 JOIN_M = 40.0
 
@@ -53,7 +37,7 @@ REGIONS_SERVED = frozenset({"svy", "la", "sac"})
 
 
 @lru_cache(maxsize=1)
-def _buildings_cached(refresh: bool) -> tuple[dict, ...]:
+def buildings(*, refresh: bool = False) -> tuple[dict, ...]:
     path = cached_get(URL, f"ab802_{REPORTING_YEAR}.xlsx", refresh=refresh)
     df = pd.read_excel(path, header=HEADER_ROW)
     out = []
@@ -74,17 +58,8 @@ def _buildings_cached(refresh: bool) -> tuple[dict, ...]:
     return tuple(out)
 
 
-def buildings(*, refresh: bool = False) -> tuple[dict, ...]:
-    return _buildings_cached(refresh)
-
-
 def attach(rows: list[dict], region: RegionName, *, refresh: bool = False) -> dict[str, int]:
-    """Replace estimates with disclosures for sinks in a California region.
-
-    The statewide list is not pre-filtered by region: `attach_nearest`'s
-    bounding-box rejection makes the whole-state scan cheap, and the sinks are
-    already clipped to the region.
-    """
+    """Replace estimates with disclosures for sinks in a California region."""
     if region not in REGIONS_SERVED:
         return {"joined": 0, "steam_heated": 0, "candidates": 0}
     return attach_nearest(
