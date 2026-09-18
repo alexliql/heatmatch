@@ -1,6 +1,6 @@
 """Jurisdiction clips, used to narrow every source to its region.
 
-Required, not optional: the nyc bbox in §3.1 extends across the Hudson into New
+Required, not optional: the nyc bbox extends across the Hudson into New
 Jersey, and the nova bbox reaches into Maryland and West Virginia, so bbox
 membership alone would pull in facilities from the wrong state entirely.
 

@@ -1,10 +1,8 @@
 """Data centers from the IM3 Open Source Data Center Atlas.
 
-Named pnnl.py to match the layout in HEATMATCH.md §1; the dataset is published
-by PNNL's IM3 project via MSD-LIVE.
+Published by PNNL's IM3 project via MSD-LIVE, hence the module name.
 
-Two things differ from what §3.3 assumed, both verified against the published
-data: the Atlas carries no capacity field (so MW is always estimated from
+Two things, both verified against the published data: the Atlas carries no capacity field (so MW is always estimated from
 footprint area), and it is itself derived from OpenStreetMap under ODbL.
 
 `sqft` is an OpenStreetMap building polygon — a footprint, not floor area —

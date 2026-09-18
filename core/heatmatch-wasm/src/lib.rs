@@ -1,11 +1,11 @@
-//! wasm-bindgen surface for heatmatch-core (HEATMATCH.md §5).
+//! wasm-bindgen surface for heatmatch-core.
 //!
 //! GeoJSON is parsed once, in the constructor: the browser holds the engine for
 //! the life of the page and every slider move re-ranks from the parsed data,
 //! so parsing per call would dominate the cost of ranking.
 #![forbid(unsafe_code)]
 
-use geo::{Coord, LineString, Polygon};
+use geo::Polygon;
 use geojson::{GeoJson, Value as GeoValue};
 use heatmatch_core::{DataCenter, Econ, Engine, ProfileOverrides, Region, Sink, Weights};
 use serde::de::DeserializeOwned;
@@ -80,7 +80,7 @@ fn point_features<T: DeserializeOwned>(raw: &str, what: &str) -> Result<Vec<T>, 
     Ok(out)
 }
 
-/// Exterior rings of every polygon in a collection, in lon/lat.
+/// Every polygon in a collection, in lon/lat.
 fn water_polygons(raw: &str) -> Result<Vec<Polygon<f64>>, JsError> {
     if raw.trim().is_empty() {
         return Ok(Vec::new());
@@ -89,33 +89,11 @@ fn water_polygons(raw: &str) -> Result<Vec<Polygon<f64>>, JsError> {
     let GeoJson::FeatureCollection(fc) = parsed else {
         return Err(JsError::new("water must be a FeatureCollection"));
     };
-
-    let ring = |r: &Vec<Vec<f64>>| {
-        LineString::from(
-            r.iter()
-                .map(|p| Coord { x: p[0], y: p[1] })
-                .collect::<Vec<_>>(),
-        )
-    };
-
     let mut out = Vec::new();
-    for feature in fc.features {
-        let Some(geometry) = feature.geometry else {
-            continue;
-        };
-        match geometry.value {
-            GeoValue::Polygon(rings) => {
-                if let Some(first) = rings.first() {
-                    out.push(Polygon::new(ring(first), vec![]));
-                }
-            }
-            GeoValue::MultiPolygon(polys) => {
-                for rings in polys {
-                    if let Some(first) = rings.first() {
-                        out.push(Polygon::new(ring(first), vec![]));
-                    }
-                }
-            }
+    for geometry in fc.features.into_iter().filter_map(|f| f.geometry) {
+        match geo::Geometry::<f64>::try_from(geometry) {
+            Ok(geo::Geometry::Polygon(p)) => out.push(p),
+            Ok(geo::Geometry::MultiPolygon(mp)) => out.extend(mp),
             _ => {}
         }
     }
@@ -176,19 +154,7 @@ impl WasmEngine {
     /// An instance method, not a static one: a region may override the shapes
     /// from the data bundle, so the answer depends on what was loaded.
     pub fn profiles(&self, region: &str) -> Result<JsValue, JsError> {
-        let map: std::collections::BTreeMap<String, [f32; 12]> = self
-            .inner
-            .profiles(parse_region(region)?)
-            .into_iter()
-            .map(|(cat, p)| {
-                let key = serde_json::to_value(cat)
-                    .ok()
-                    .and_then(|v| v.as_str().map(str::to_owned))
-                    .unwrap_or_default();
-                (key, p)
-            })
-            .collect();
-        to_js(&map)
+        to_js(&self.inner.profiles(parse_region(region)?))
     }
 
     pub fn default_weights(region: &str) -> Result<Weights, JsError> {

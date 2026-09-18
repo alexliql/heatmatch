@@ -1,4 +1,4 @@
-// Node smoke test for the built wasm package (HEATMATCH.md §5).
+// Node smoke test for the built wasm package.
 //
 // Loads the core crate's fixtures through the real wasm boundary and checks the
 // engine both ranks them and reports the JSON shapes the web app expects. This

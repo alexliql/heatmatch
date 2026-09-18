@@ -1,7 +1,7 @@
 """Water polygons, used to detect pipes that would cross open water.
 
-§3.3 names NYC Open Data hydrography and USGS NHD. This uses OpenStreetMap via
-Overpass instead, for three reasons: water only matters where a pipe might run,
+OpenStreetMap via Overpass rather than NYC hydrography or USGS NHD, for three
+reasons: water only matters where a pipe might run,
 so it can be fetched around the data centers exactly as sinks are; NHD's
 statewide extract is hundreds of megabytes of which almost none is relevant;
 and it keeps every layer under one licence (ODbL) and one fetch path.

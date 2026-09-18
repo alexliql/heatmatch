@@ -1,4 +1,4 @@
-"""Steam-territory and thermal-network polygons (HEATMATCH.md §3.3).
+"""Steam-territory and thermal-network polygons.
 
 Both come from hand-maintained GeoJSON in `ingest/manual/`, because neither is
 published as geodata. They are approximations and say so in their own

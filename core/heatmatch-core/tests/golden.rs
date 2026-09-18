@@ -1,4 +1,4 @@
-//! Golden ranking over hand-built fixtures (HEATMATCH.md §4.7).
+//! Golden ranking over hand-built fixtures.
 //!
 //! Expected values were computed independently in Python from the spec's
 //! formulas, not captured from this implementation's output — a snapshot of

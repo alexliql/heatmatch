@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Static export only — there is no server in this project (spec §0).
+  // Static export only — there is no server in this project.
   output: "export",
   images: { unoptimized: true },
   webpack: (config) => {

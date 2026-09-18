@@ -1,4 +1,4 @@
-"""Heat sinks from OpenStreetMap via the Overpass API (HEATMATCH.md §3.3).
+"""Heat sinks from OpenStreetMap via the Overpass API.
 
 Two details that are easy to get wrong and were verified against the live API:
 the service returns 406 for a default requests/curl User-Agent, and `out geom`
@@ -207,7 +207,7 @@ def candidates(
                     "area_m2": area_m2,
                     "area_source": "osm" if area_m2 else "none",
                     "floor_area_m2": area_m2 * floors if area_m2 else None,
-                    "steam_heated": False,  # needs LL84 (T8)
+                    "steam_heated": False,  # set by the measured-demand joins
                     "sources": [OVERPASS_SOURCE["id"]],
                 }
             )

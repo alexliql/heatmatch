@@ -1,4 +1,4 @@
-"""NYC Local Law 84 energy disclosure (HEATMATCH.md §3.3).
+"""NYC Local Law 84 energy disclosure.
 
 Replaces the footprint guess with reported fuel use for buildings large enough
 to be covered. Only heating fuels count: electricity is not what a heat network
@@ -77,7 +77,7 @@ def attach(rows: list[dict], lots: Sequence[dict], *, refresh: bool = False) -> 
     """Replace footprint estimates with LL84 fuel use where a lot matches.
 
     Mutates `rows` in place and returns counts for the CLI summary. A sink is
-    matched to the nearest tax-lot centroid within LL84_JOIN_M (§3.3).
+    matched to the nearest tax-lot centroid within LL84_JOIN_M.
     """
     stats = {"joined": 0, "steam_heated": 0, "candidates": len(rows)}
     fuels = by_bbl(refresh=refresh)

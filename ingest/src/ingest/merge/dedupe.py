@@ -1,4 +1,4 @@
-"""Reconcile data center candidates across sources (HEATMATCH.md §3.3).
+"""Reconcile data center candidates across sources.
 
 The Atlas and PLUTO describe the same buildings in different words — Telehouse
 appears as "Telehouse Teleport" in one and "7 Teleport Drive" in the other — so

@@ -1,8 +1,6 @@
 """Regions, source endpoints and estimation constants.
 
-Every magic number the pipeline uses lives here so the README's methodology
-section (T9) has a single place to document and justify. Values are from
-HEATMATCH.md §3.1/§3.3 unless the comment says otherwise.
+Every magic number the pipeline uses lives here.
 """
 
 from typing import Literal
@@ -21,7 +19,7 @@ SinkCat = Literal[
     "hotel",
 ]
 
-# --- regions (§3.1) -------------------------------------------------------
+# --- regions -------------------------------------------------------
 # bbox is (min_lon, min_lat, max_lon, max_lat). A feature belongs to nyc if it
 # falls in the nyc bbox, else upstate; both are additionally clipped to the NYS
 # boundary, because the nyc bbox reaches well into New Jersey.
@@ -219,7 +217,7 @@ LL84_SOURCE = {
 }
 
 # Building classes that could plausibly house a data center: E/F industrial and
-# warehouse, I utility, Y public facility (§3.3).
+# warehouse, I utility, Y public facility.
 PLUTO_BLDG_CLASS_PREFIXES = ("E", "F", "I", "Y")
 
 # Owner-name fragments for known colocation and carrier operators. Matched
@@ -362,7 +360,7 @@ Counterfactual = Literal["gas", "electric_resistance", "heat_pump"]
 MEASURED_NEAR_ZERO_KWH_PER_M2 = 10.0
 MODELLED_SUBSTANTIAL_KWH_PER_M2 = 30.0
 
-# A sink is matched to a tax lot within this distance of its centroid (§3.3).
+# A sink is matched to a tax lot within this distance of its centroid.
 LL84_JOIN_M = 40.0
 
 OVERPASS_URL = "https://overpass-api.de/api/interpreter"
@@ -375,7 +373,7 @@ OVERPASS_SOURCE = {
     "note": "© OpenStreetMap contributors, via the Overpass API.",
 }
 
-# Tag filters per sink category (§3.3). Each entry is a list of Overpass tag
+# Tag filters per sink category. Each entry is a list of Overpass tag
 # selectors; every selector is queried across node, way and relation.
 OVERPASS_FILTERS: dict[SinkCat, list[str]] = {
     "pool": [
@@ -395,7 +393,7 @@ OVERPASS_FILTERS: dict[SinkCat, list[str]] = {
 
 # Where apartment buildings are collected as sinks. Dense enough to matter in
 # New York City and Los Angeles; elsewhere the category is mostly suburban
-# garden apartments with little to gain from a heat network (§3.3).
+# garden apartments with little to gain from a heat network.
 MULTIFAMILY_REGIONS: frozenset[str] = frozenset({"nyc", "la"})
 
 
@@ -500,7 +498,7 @@ COMSTOCK_PROFILE_TYPE_BY_CAT: dict[str, str] = {
 
 # --- data center capacity estimation --------------------------------------
 # The Atlas carries no capacity field, so MW is always an estimate here.
-# 75 W/sq ft is §3.3's low colo density.
+# 75 W/sq ft is a low colo density.
 MW_PER_SQFT = 0.000075
 
 # Northern Virginia's purpose-built halls are far denser than the mixed-use
@@ -552,7 +550,7 @@ NOVA_MIN_DC_FOOTPRINT_M2 = 4000.0
 DEFAULT_DC_MW = 1.5
 
 # --- sink demand estimation -----------------------------------------------
-# Annual thermal intensity, kWh per m² of floor area (§3.3).
+# Annual thermal intensity, kWh per m² of floor area.
 INTENSITY_KWH_PER_M2: dict[SinkCat, float] = {
     "pool": 400.0,
     "hospital": 250.0,
@@ -581,7 +579,7 @@ FLOORS_GUESS: dict[SinkCat, float] = {
     "hotel": 10.0,
 }
 
-# Minimum footprint area (m²) for a way/relation to count (§3.3). Categories
+# Minimum footprint area (m²) for a way/relation to count. Categories
 # absent from this map have no area gate.
 MIN_AREA_M2: dict[SinkCat, float] = {
     "school": 5000.0,
@@ -633,7 +631,7 @@ CATEGORY_DEFAULT_KWH: dict[SinkCat, float] = {
 }
 
 # Sinks are kept only if within this multiple of a region's radius of some data
-# center (§3.3); the 1.1 is slack so a later radius tweak in the UI does not
+# center; the 1.1 is slack so a later radius tweak in the UI does not
 # immediately run out of data.
 SINK_PREFILTER_SLACK = 1.1
 
@@ -647,7 +645,7 @@ def region_for(lat: float, lon: float) -> RegionName | None:
     """Assign a point to a region, or None if it is in neither.
 
     Order matters and is not arbitrary: the upstate bbox fully contains the nyc
-    one, so nyc must be tested first for "upstate = the rest of NYS" (§3.1) to
+    one, so nyc must be tested first for "upstate = the rest of NYS" to
     hold. No other bbox overlaps any other, so their order is free. Callers
     still need the boundary check separately; these are bounding boxes, and
     the nyc one reaches into New Jersey, the nova one into Maryland and West

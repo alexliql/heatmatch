@@ -1,7 +1,7 @@
 """NYC tax lots, for data center candidates and for the LL84 join.
 
-§3.3 calls for the MapPLUTO shapefile. This queries the PLUTO table through
-NYC Open Data's API instead: it carries a lot centroid and the BBL already, so
+Queries the PLUTO table through NYC Open Data's API rather than downloading
+the MapPLUTO shapefile: it carries a lot centroid and the BBL already, so
 the hundreds of megabytes of lot geometry in MapPLUTO would be downloaded and
 then thrown away.
 """

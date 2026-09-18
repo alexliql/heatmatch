@@ -1,4 +1,4 @@
-"""Output determinism and id stability (HEATMATCH.md §3.2).
+"""Output determinism and id stability.
 
 The filename embeds a content hash and CI compares it against the bytes on
 disk, so any nondeterminism here turns into a red build rather than a subtle

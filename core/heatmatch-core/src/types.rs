@@ -1,4 +1,4 @@
-//! Core domain types (HEATMATCH.md §4.1).
+//! Core domain types.
 //!
 //! The serde field names here are a contract with the ingest pipeline: they
 //! must match the GeoJSON `properties` keys that `ingest/src/ingest/schema.py`

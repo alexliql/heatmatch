@@ -1,4 +1,4 @@
-"""Output schema — the contract with heatmatch-core (HEATMATCH.md §3.2).
+"""Output schema — the contract with heatmatch-core.
 
 Property names here must match the serde field names in core/heatmatch-core's
 types.rs exactly. Nothing checks that automatically; changing a name here is a
@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 from ingest.config import MW_CONFIDENCE_BY_SOURCE, Counterfactual, RegionName, SinkCat
 
-# `pnnl` from §3.2 is deliberately absent: the Atlas publishes no capacity
+# There is no `pnnl` value: the Atlas publishes no capacity
 # field, so a MW value can never be sourced directly from it. Area-derived
 # estimates are `atlas_sqft`; footprint-less rows fall back to `atlas_default`.
 MwSource = Literal[

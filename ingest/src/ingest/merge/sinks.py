@@ -148,7 +148,7 @@ def build(
 
         keep = keep_steam_heated(region)
         for row in near:
-            # District-steam buildings already have their heat (§3.3) — unless
+            # District-steam buildings already have their heat — unless
             # the region says its steam customers are exactly who to keep.
             if row["steam_heated"] and not keep:
                 stats["dropped_steam_heated"] += 1

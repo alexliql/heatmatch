@@ -1,6 +1,6 @@
 """Test-suite guarantees.
 
-§7 requires the ingest job to run without network access. Rather than trusting
+The ingest tests must run without network access. Rather than trusting
 that every test remembers to stub its source, this blocks HTTP at the transport
 layer: a test that forgets fails loudly here instead of silently downloading
 tens of megabytes on a CI runner.

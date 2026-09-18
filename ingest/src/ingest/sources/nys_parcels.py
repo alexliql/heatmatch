@@ -1,4 +1,4 @@
-"""Upstate data center candidates from NYS parcel data (HEATMATCH.md §3.3).
+"""Upstate data center candidates from NYS parcel data.
 
 The NYS GIS Clearinghouse publishes statewide parcels as a multi-gigabyte
 download with no public query API, which is more than this pipeline can justify

@@ -1,4 +1,4 @@
-"""`ingest run --region nyc|upstate|all` — see HEATMATCH.md §3.4.
+"""`ingest run --region nyc|upstate|all`.
 
 The no-op callback is load-bearing: with a single registered command Typer
 collapses the group and exposes its options at the root, which would make the
@@ -217,7 +217,6 @@ def _summary(regions, dcs, sink_rows, stats) -> None:
         )
         for cat, n in sorted(Counter(s.cat for s in r_sinks).items()):
             typer.echo(f"      {cat:24s} {n:5d}")
-        # LL84 joins in T8; until then every sink demand is an estimate.
         by_src = Counter(s.demand_source for s in r_sinks)
         typer.echo(f"      demand sources: {dict(by_src)}")
         by_conf = Counter(d.mw_confidence for d in r_dcs)

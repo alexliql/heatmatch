@@ -1,4 +1,4 @@
-//! Ranking engine (HEATMATCH.md §4.6).
+//! Ranking engine.
 //!
 //! Scoring runs per data center against the sinks in its region. The supply a
 //! facility has is finite, so sinks compete for it: the allocation step is what
@@ -6,17 +6,16 @@
 
 use std::collections::HashMap;
 
-use rstar::RTree;
+use rstar::{primitives::GeomWithData, RTree};
 use smallvec::SmallVec;
 use thiserror::Error;
 
 use crate::distance::{euclid, pipe_length, search_radius};
 use crate::econ::{self, Connection};
 use crate::frame::LocalFrame;
-use crate::index::{self, SinkPt};
 use crate::season::{self, ProfileError, ProfileOverrides, Profiles};
 use crate::thermo::{self, HeatPump};
-use crate::types::{Contribution, DataCenter, Match, Region, Sink};
+use crate::types::{Contribution, DataCenter, Match, Region, Sink, SinkCat};
 use crate::water::WaterIndex;
 use crate::weights::{Decay, Econ, WaterPolicy, Weights};
 
@@ -36,7 +35,7 @@ struct RegionData {
     dcs: Vec<DataCenter>,
     sinks: Vec<Sink>,
     sink_xy: Vec<[f32; 2]>,
-    tree: RTree<SinkPt>,
+    tree: RTree<GeomWithData<[f32; 2], usize>>,
     frame: LocalFrame,
     water: WaterIndex,
     /// The built-in table, unless the bundle overrode it for this region.
@@ -112,10 +111,7 @@ impl Engine {
             let pts = sink_xy
                 .iter()
                 .enumerate()
-                .map(|(i, xy)| SinkPt {
-                    xy: *xy,
-                    idx: i as u32,
-                })
+                .map(|(i, xy)| GeomWithData::new(*xy, i))
                 .collect();
 
             regions.insert(
@@ -124,7 +120,7 @@ impl Engine {
                     dcs: dcs.iter().filter(|d| d.region == region).cloned().collect(),
                     sinks: region_sinks,
                     sink_xy,
-                    tree: index::build(pts),
+                    tree: RTree::bulk_load(pts),
                     water: WaterIndex::build(water, &frame),
                     frame,
                     profiles: match overrides.get(&region) {
@@ -160,12 +156,7 @@ impl Engine {
             .map(|dc| self.score_dc(data, dc, w, e))
             .collect();
         // Ties broken by id so the order never depends on input ordering.
-        out.sort_by(|a, b| {
-            b.score
-                .partial_cmp(&a.score)
-                .unwrap_or(std::cmp::Ordering::Equal)
-                .then_with(|| a.dc.cmp(&b.dc))
-        });
+        out.sort_by(|a, b| b.score.total_cmp(&a.score).then_with(|| a.dc.cmp(&b.dc)));
         Ok(out)
     }
 
@@ -197,7 +188,7 @@ impl Engine {
             .tree
             .locate_within_distance(dc_xy, r * r)
             .filter_map(|pt| {
-                let idx = pt.idx as usize;
+                let idx = pt.data;
                 let sink = &data.sinks[idx];
                 let mut pipe_m = pipe_length(dc_xy, data.sink_xy[idx], &w.distance);
 
@@ -256,7 +247,7 @@ impl Engine {
                     // heat smaller. Everything downstream of the allocation
                     // stays physical.
                     raw: w.cat[sink.cat]
-                        * w.confidence.get(dc.mw_confidence)
+                        * w.confidence[dc.mw_confidence]
                         * demand_norm
                         * decay.max(0.0)
                         * hp_factor
@@ -271,8 +262,7 @@ impl Engine {
         // depend on the r-tree's traversal order.
         found.sort_by(|a, b| {
             b.raw
-                .partial_cmp(&a.raw)
-                .unwrap_or(std::cmp::Ordering::Equal)
+                .total_cmp(&a.raw)
                 .then_with(|| data.sinks[a.idx].id.cmp(&data.sinks[b.idx].id))
         });
         found
@@ -288,7 +278,7 @@ impl Engine {
         let candidates = self.candidates(data, dc, w);
         let demand_mwh_in_radius = candidates.iter().map(|c| c.demand_mwh).sum();
 
-        let contributions = candidates
+        let mut contributions: Vec<Contribution> = candidates
             .into_iter()
             .map(|c| {
                 let delivered = c.demand_mwh.min(remaining).min(cap).max(0.0);
@@ -313,17 +303,13 @@ impl Engine {
                     score: c.raw * share,
                 }
             })
-            .collect::<Vec<_>>();
+            .collect();
 
-        // Allocation runs in desirability order, but a sink's final score is
-        // scaled by the share it actually received, so that order is not the
-        // score order. Re-sort before returning: callers, and `top`, are
-        // promised best-scoring first.
-        let mut contributions = contributions;
+        // Allocation order is desirability order, but the score is scaled by
+        // the share received, so re-sort: callers are promised best first.
         contributions.sort_by(|a, b| {
             b.score
-                .partial_cmp(&a.score)
-                .unwrap_or(std::cmp::Ordering::Equal)
+                .total_cmp(&a.score)
                 .then_with(|| a.sink.cmp(&b.sink))
         });
 
@@ -342,20 +328,18 @@ impl Engine {
         } = self.contributions(data, dc, w);
 
         let score: f32 = contributions.iter().map(|c| c.score).sum();
+        let connected = contributions.iter().filter(|c| c.delivered_mwh > 0.0);
 
         // Seasonality decides how much of the allocation can actually be used:
         // heat produced in a month nobody needs it is wasted.
-        let allocated: Vec<(crate::types::SinkCat, f32)> = contributions
-            .iter()
-            .filter(|c| c.delivered_mwh > 0.0)
+        let allocated: Vec<(SinkCat, f32)> = connected
+            .clone()
             .map(|c| (c.cat, c.delivered_mwh))
             .collect();
         let (utilization, delivered_mwh) =
             season::utilization(supply_mwh, &allocated, &data.profiles);
 
-        let connections: Vec<Connection> = contributions
-            .iter()
-            .filter(|c| c.delivered_mwh > 0.0)
+        let connections: Vec<Connection> = connected
             .map(|c| Connection {
                 pipe_m: c.pipe_m,
                 delivered_mwh: c.delivered_mwh,

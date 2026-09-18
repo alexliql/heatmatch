@@ -1,4 +1,4 @@
-"""Canonical GeoJSON/manifest writing (HEATMATCH.md §3.2).
+"""Canonical GeoJSON/manifest writing.
 
 Output must be byte-identical across runs for the same input: the filename
 embeds a content hash, and CI's data-freshness job compares the two.
@@ -91,7 +91,7 @@ def write_manifest(entries: dict[str, dict], sources: list[dict]) -> Path:
 def assign_ids(rows: list[dict], prefix: str, width: int) -> list[tuple[str, dict]]:
     """Number rows within their region, best-effort stable across releases.
 
-    Sorting on position-then-name (§3.2) is what makes ids reproducible: the
+    Sorting on position-then-name is what makes ids reproducible: the
     upstream file's row order is not guaranteed stable between releases. The
     region goes in the id rather than in a single global counter so that adding
     a region cannot renumber the ones already published — Virginia sorts south
