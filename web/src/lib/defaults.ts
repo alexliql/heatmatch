@@ -4,9 +4,7 @@
 // tab, and the URL scenario, which only carries what has changed.
 
 import type { Engine } from "./engine";
-import { REGIONS, type Econ, type Region, type Weights } from "./types";
-
-type ByRegion<T> = Record<Region, T>;
+import { REGIONS, type ByRegion, type Econ, type Plain, type Weights } from "./types";
 
 /** Values come back from the engine as f32 widened to f64, so a stored 0.9
  *  reads as 0.8999999761581421. Compare at the control's own precision. */
@@ -31,12 +29,10 @@ const STEP: Record<string, number> = {
 };
 const CAT_STEP = 0.1;
 
-type Plain = Record<string, unknown>;
-
 /** Leaf-by-leaf diff of `a` against `b`; returns the changed subtree of `a`
  *  or `null` when nothing differs. Tagged unions (`distance`, `decay`,
  *  `water_crossing`) are replaced whole when their `kind` differs. */
-export function diffObject(a: Plain, b: Plain, path: string[] = []): Plain | null {
+function diffObject(a: Plain, b: Plain, path: string[] = []): Plain | null {
   const out: Plain = {};
   let any = false;
   if (typeof a.kind === "string" && a.kind !== b.kind) return a;
@@ -63,7 +59,7 @@ export function diffObject(a: Plain, b: Plain, path: string[] = []): Plain | nul
   return any ? out : null;
 }
 
-export function countLeaves(o: Plain | null): number {
+function countLeaves(o: Plain | null): number {
   if (!o) return 0;
   let n = 0;
   for (const v of Object.values(o)) {
@@ -73,7 +69,7 @@ export function countLeaves(o: Plain | null): number {
   return n;
 }
 
-export interface Diff {
+interface Diff {
   count: number;
   byRegion: ByRegion<number>;
   changes: ByRegion<{ w: Plain | null; e: Plain | null }>;

@@ -4,9 +4,7 @@
 // slider is cheap enough to do on every change of assumptions.
 
 import type { Engine } from "./engine";
-import { REGIONS, type Econ, type Match, type Region, type Weights } from "./types";
-
-type ByRegion<T> = Record<Region, T>;
+import { REGIONS, byScore, type ByRegion, type Econ, type Match, type Region, type Weights } from "./types";
 
 /** Which slider: a dotted path into `Weights`. */
 export type Param =
@@ -60,7 +58,7 @@ export function sweep(
   const values = Array.from({ length: steps + 1 }, (_, i) => min + ((max - min) * i) / steps);
   const ranks = values.map((v) => {
     const own = engine.rank(region, patched(weights[region], param, v), econ[region]);
-    const all = [...own, ...others].sort((a, b) => b.score - a.score || a.dc.localeCompare(b.dc));
+    const all = [...own, ...others].sort(byScore);
     return all.findIndex((m) => m.dc === dc) + 1;
   });
   const breaks: Sweep["breaks"] = [];
