@@ -20,11 +20,41 @@ export type {
   Weights,
 } from "@/wasm/heatmatch_wasm";
 
-// Imported as well as re-exported: the label table below needs it in scope.
-import type { Counterfactual, MwConfidence, Region } from "@/wasm/heatmatch_wasm";
+import type { Counterfactual, Match, MwConfidence, Region, SinkCat } from "@/wasm/heatmatch_wasm";
 
 /** The regions the data covers, in display order. */
 export const REGIONS = ["nyc", "upstate", "nova", "seattle", "pdx", "svy", "la", "sac"] as const;
+
+export type ByRegion<T> = Record<Region, T>;
+/** An untyped object, for the leaf-by-leaf diff and merge of weights. */
+export type Plain = Record<string, unknown>;
+
+/** Best first: score descending, id ascending on ties — the engine's own order. */
+export const byScore = (a: Match, b: Match) => b.score - a.score || a.dc.localeCompare(b.dc);
+
+/** A point feature collection as ingest writes it. */
+export interface PointCollection<P> {
+  features: { properties: P; geometry: { coordinates: [number, number] } }[];
+}
+
+export interface DcFeature {
+  id: string;
+  name: string;
+  mw: number;
+  cooling: string;
+  region: Region;
+  mw_confidence?: MwConfidence;
+  campus_id?: string | null;
+}
+
+export interface SinkFeature {
+  id: string;
+  name: string;
+  cat: SinkCat;
+  demand_kwh: number;
+  demand_source?: string;
+  area_m2?: number | null;
+}
 
 /** Which state each region is in. The region control groups by this, and a
  *  state view can filter the merged ranking without another schema change. */
@@ -67,7 +97,6 @@ export const REGION_VIEW_LABELS: Record<RegionView, string> = {
   ...REGION_LABELS,
 };
 
-/** Short forms, for the toggle where four labels must share one row. */
 /** How a capacity figure reads at a glance, matching the map's markers:
  *  a solid disc is a stated capacity, an outline is a guess from a footprint. */
 export const CONFIDENCE_MARKS: Record<MwConfidence, string> = {
@@ -138,13 +167,13 @@ export const CAT_LABELS: Record<(typeof SINK_CATS)[number], string> = {
 };
 
 /** What `manifest.json` records about one published asset. */
-export interface AssetEntry {
+interface AssetEntry {
   file: string;
   count: number;
   hash: string;
 }
 
-export interface SourceEntry {
+interface SourceEntry {
   id: string;
   url: string;
   license: string;

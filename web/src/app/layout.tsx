@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 
+import { THEME_KEY } from "@/lib/store";
+
 import "@/styles/tokens.css";
 import "@/styles/globals.css";
 
@@ -30,8 +32,7 @@ export const viewport: Viewport = {
 };
 
 // Runs before first paint so a saved theme never flashes the other one.
-// Mirrors the key the store uses.
-const THEME_INIT = `(function(){try{var t=localStorage.getItem("heatmatch:theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t;}catch(e){}})();`;
+const THEME_INIT = `(function(){try{var t=localStorage.getItem(${JSON.stringify(THEME_KEY)});if(t==="light"||t==="dark")document.documentElement.dataset.theme=t;}catch(e){}})();`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

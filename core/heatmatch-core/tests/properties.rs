@@ -1,4 +1,4 @@
-//! Invariants that must hold for any inputs (HEATMATCH.md §4.7).
+//! Invariants that must hold for any inputs.
 //!
 //! These catch the failures a golden test cannot: a golden test pins one
 //! scenario, while these assert the model's shape over the whole input space.
@@ -24,22 +24,6 @@ fn base_weights() -> Weights {
 /// Region defaults; the economics model is exercised in `econ_*` tests.
 fn econ() -> Econ {
     Econ::default_for(Region::Nyc)
-}
-
-fn cat_of(i: usize) -> SinkCat {
-    const CATS: [SinkCat; 10] = [
-        SinkCat::Pool,
-        SinkCat::Hospital,
-        SinkCat::University,
-        SinkCat::School,
-        SinkCat::Greenhouse,
-        SinkCat::Brewery,
-        SinkCat::Wwtp,
-        SinkCat::Office,
-        SinkCat::ResidentialMultifamily,
-        SinkCat::Hotel,
-    ];
-    CATS[i % CATS.len()]
 }
 
 proptest! {
@@ -79,8 +63,7 @@ proptest! {
         let before = engine.rank(Region::Nyc, &base_weights(), &econ()).unwrap();
 
         let mut w = base_weights();
-        let cat = cat_of(idx);
-        w.cat.set(cat, w.cat.get(cat) + bump);
+        w.cat[SinkCat::ALL[idx]] += bump;
         let after = engine.rank(Region::Nyc, &w, &econ()).unwrap();
 
         for b in &before {

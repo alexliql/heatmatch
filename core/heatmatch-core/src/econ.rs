@@ -1,4 +1,4 @@
-//! Capital cost, savings and payback (HEATMATCH.md §4.6 step 5).
+//! Capital cost, savings and payback.
 //!
 //! Indicative only. Every figure here is a planning-grade estimate; see the
 //! README's limitations before treating any of it as a number to spend money
@@ -30,13 +30,8 @@ pub struct Connection {
 }
 
 /// What `delivered_mwh` of heat is worth to a sink, given what it would
-/// otherwise have paid for it.
-///
-/// Written as `delivered * price / divisor`, not `delivered * (price /
-/// divisor)`: the two differ by an ulp, and the gas arm must reproduce the
-/// pre-counterfactual formula bit for bit so that a dataset with no
-/// counterfactual information — all gas, as New York is — prices exactly as
-/// it always did.
+/// otherwise have paid for it. Operation order is deliberate: the regression
+/// fixture compares exact f32s.
 pub fn avoided_cost(delivered_mwh: f32, c: Counterfactual, e: &Econ) -> f32 {
     match c {
         // Gas bought at the meter, burnt at boiler efficiency.
@@ -86,17 +81,11 @@ pub fn evaluate(connections: &[Connection], delivered_mwh: f32, e: &Econ, hours:
         })
         .sum();
 
-    // Heat displaced at whatever each sink would otherwise have paid for it,
-    // less the electricity the heat pumps draw, plus the cooling the data
-    // center no longer has to run.
-    //
-    // Priced on the *seasonal* total, which is what the savings have always
-    // been based on. When every sink shares one counterfactual that is a
-    // single call; a mixed set is priced per allocation and scaled to the
-    // seasonal total. The uniform path is not an optimisation: a weighted mean
-    // of identical values rounds back to the value only almost always, and
-    // "almost" is one ulp on savings, which the regression snapshot rightly
-    // refuses.
+    // Heat displaced at whatever each sink would otherwise have paid, priced
+    // on the seasonal total. A uniform counterfactual is one call; a mixed
+    // set is priced per allocation and scaled. The uniform path is not an
+    // optimisation: a weighted mean of identical values can differ by an ulp,
+    // which the regression snapshot refuses.
     let heat_saved = match connections.first().map(|c| c.counterfactual) {
         None => 0.0,
         Some(first) if connections.iter().all(|c| c.counterfactual == first) => {

@@ -27,7 +27,7 @@ fn heat_is_used_directly_when_it_is_already_hot_enough() {
 
 #[test]
 fn air_cooled_to_hospital_matches_the_spec_worked_example() {
-    // §4.7: cop ≈ 0.5 * 348.15 / 45 ≈ 3.87. The 45 K denominator is the full
+    // Reference: cop ≈ 0.5 * 348.15 / 45 ≈ 3.87. The 45 K denominator is the full
     // lift including the approach, which is why the evaporator sees
     // supply - approach rather than supply.
     let hp = thermo::heat_pump(Cooling::Air, SinkCat::Hospital, 5.0, 0.5);

@@ -22,7 +22,7 @@ jobs:
         with:
           enable-cache: true
       # No network access to upstream sources: every source module is mocked
-      # in tests (spec §7).
+      # in tests.
       - run: uv sync --locked
       - run: uv run ruff check .
       - run: uv run pytest -q

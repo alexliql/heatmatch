@@ -1,10 +1,7 @@
-"""`ingest run --region nyc|upstate|all` — see HEATMATCH.md §3.4.
+"""`ingest run --region <name>|all`. The no-op callback keeps Typer from
+collapsing the single command into the root."""
 
-The no-op callback is load-bearing: with a single registered command Typer
-collapses the group and exposes its options at the root, which would make the
-invocation `ingest --region` instead of the specified `ingest run --region`.
-"""
-
+import json
 from collections import Counter
 
 import typer
@@ -21,6 +18,8 @@ from ingest.config import (
 )
 from ingest.merge import datacenters, emit, sinks
 from ingest.sources import ab802, comstock, curated_mw, hydro, nys_parcels, seattle_bench, seed_dcs
+from ingest.sources.zones import ZONE_FILES
+from ingest.util import MANUAL
 
 app = typer.Typer(help="Build heatmatch's static data assets.", no_args_is_help=True)
 
@@ -40,17 +39,9 @@ def _resolve(region: str) -> list[RegionName]:
 
 
 def _check_writable(region: str, write: bool) -> None:
-    """Refuse a partial run that would publish an incomplete bundle.
-
-    The bundle is one flat set of files covering every region, so a run over
-    one region rewrites them with only that region in it, silently deleting
-    the others. Easy to do by accident and hard to notice afterwards.
-
-    A named function rather than an inline check so the message can be tested
-    directly. Asserting on it through `CliRunner` would mean asserting on
-    Rich-rendered output, which wraps to the terminal width — see this
-    module's tests.
-    """
+    """Refuse a partial run that would publish an incomplete bundle: the bundle
+    is one flat set of files, so a one-region run silently drops the others.
+    A named function so the message can be tested without Rich's wrapping."""
     if write and region != "all":
         raise typer.BadParameter(
             f"--region {region} would rewrite the whole bundle with only {region} in it, "
@@ -102,9 +93,7 @@ def run(
         "water": emit.write_features("water", water_features),
         "zones": emit.write_features("zones", zones_features()),
     }
-    # Only regions that model their own seasonality appear here; the engine
-    # fills every other region, and every unlisted category, from its built-in
-    # table. An empty table is simply not published.
+    # Only regions that model their own seasonality; the engine fills the rest.
     profiles = {
         r: comstock.profiles_for_region(comstock.build(r, refresh=refresh)["by_type"])
         for r in regions
@@ -139,9 +128,8 @@ def run(
     typer.echo(f"  manifest     {path.name}")
 
 
-# Measured-demand sources that were verified and deliberately not used. They
-# appear in the manifest so the decision is on the record next to the sources
-# that were, rather than in a conversation nobody can find.
+# Measured-demand sources checked and deliberately not used, recorded in the
+# manifest next to the ones that were.
 NOT_USED = [
     {
         "id": "pdx_bench",
@@ -183,20 +171,11 @@ NOT_USED = [
 
 
 def zones_features() -> list[dict]:
-    """Steam and thermal-network polygons, passed through for the map to draw.
-
-    The same file list `zones.tag` reads, so what is drawn and what scores as
-    `in_steam` cannot drift apart.
-    """
-    import json
-    from pathlib import Path
-
-    from ingest.sources.zones import ZONE_FILES
-
-    manual = Path(__file__).resolve().parents[2] / "manual"
+    """Steam and thermal-network polygons for the map: the same files `zones.tag`
+    reads, so what is drawn and what scores cannot drift apart."""
     out: list[dict] = []
     for name, kind in ZONE_FILES:
-        path = manual / name
+        path = MANUAL / name
         if not path.exists():
             continue
         for f in json.loads(path.read_text()).get("features", []):
@@ -217,7 +196,6 @@ def _summary(regions, dcs, sink_rows, stats) -> None:
         )
         for cat, n in sorted(Counter(s.cat for s in r_sinks).items()):
             typer.echo(f"      {cat:24s} {n:5d}")
-        # LL84 joins in T8; until then every sink demand is an estimate.
         by_src = Counter(s.demand_source for s in r_sinks)
         typer.echo(f"      demand sources: {dict(by_src)}")
         by_conf = Counter(d.mw_confidence for d in r_dcs)

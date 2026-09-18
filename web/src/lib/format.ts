@@ -29,9 +29,7 @@ export const payback = (yrs: number | undefined | null) =>
   yrs == null ? "never" : yrs > 100 ? ">100 yr" : `${yrs.toFixed(1)} yr`;
 
 /** Bucket used to colour data centers on the map and in the table. */
-export type PaybackBucket = "fast" | "medium" | "slow" | "none";
-
-export const BUCKETS: readonly PaybackBucket[] = ["fast", "medium", "slow", "none"];
+type PaybackBucket = "fast" | "medium" | "slow" | "none";
 
 export function paybackBucket(yrs: number | undefined | null): PaybackBucket {
   if (yrs == null) return "none";
@@ -61,24 +59,8 @@ export const BUCKET_VARS: Record<PaybackBucket, string> = {
   none: "--heat-none",
 };
 
-/** Sink categories are grouped into five families so the colours relate to
- *  each other: within a family the hue is shared and lightness separates the
- *  members. Ten unrelated hues was more than anyone could hold. */
-export type SinkGroup = "water" | "buildings" | "institutions" | "growing" | "industry";
-
-export const SINK_GROUPS: Record<SinkCat, SinkGroup> = {
-  pool: "water",
-  wwtp: "water",
-  hotel: "buildings",
-  residential_multifamily: "buildings",
-  office: "buildings",
-  hospital: "institutions",
-  school: "institutions",
-  university: "institutions",
-  greenhouse: "growing",
-  brewery: "industry",
-};
-
+/** Sink categories are coloured in five hue families (water, buildings,
+ *  institutions, growing, industry); lightness separates members. */
 export const SINK_VARS: Record<SinkCat, string> = {
   pool: "--cat-pool",
   wwtp: "--cat-wwtp",
@@ -98,33 +80,25 @@ export const cssVar = (name: string) => `var(${name})`;
 export interface Palette {
   bucket: Record<PaybackBucket, string>;
   sink: Record<SinkCat, string>;
-  sinkField: string;
   accent: string;
   fg: string;
   bg: string;
   line: string;
   zone: string;
-  dark: boolean;
 }
 
 export function palette(): Palette {
   const cs = getComputedStyle(document.documentElement);
   const read = (v: string) => cs.getPropertyValue(v).trim();
-  const bucket = Object.fromEntries(
-    BUCKETS.map((b) => [b, read(BUCKET_VARS[b])]),
-  ) as Record<PaybackBucket, string>;
-  const sink = Object.fromEntries(
-    (Object.keys(SINK_VARS) as SinkCat[]).map((c) => [c, read(SINK_VARS[c])]),
-  ) as Record<SinkCat, string>;
+  const resolve = <K extends string>(vars: Record<K, string>) =>
+    Object.fromEntries(Object.entries<string>(vars).map(([k, v]) => [k, read(v)])) as Record<K, string>;
   return {
-    bucket,
-    sink,
-    sinkField: read("--sink"),
+    bucket: resolve(BUCKET_VARS),
+    sink: resolve(SINK_VARS),
     accent: read("--accent"),
     fg: read("--fg-0"),
     bg: read("--bg-0"),
     line: read("--map-halo"),
     zone: read("--zone"),
-    dark: read("--scheme") === "dark",
   };
 }

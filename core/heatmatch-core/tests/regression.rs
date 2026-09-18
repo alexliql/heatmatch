@@ -11,31 +11,12 @@
 //! Regenerate deliberately, never reflexively:
 //! `cargo run --release --example baseline -p heatmatch-core`
 
+mod support;
+
 use std::fs;
-use std::path::PathBuf;
 
-use heatmatch_core::{DataCenter, Econ, Engine, Region, Sink, Weights};
+use heatmatch_core::{Econ, Engine, Region, Weights};
 use serde_json::{Map, Value};
-
-fn flatten(feature: &Value) -> Map<String, Value> {
-    let mut props = feature["properties"].as_object().cloned().unwrap();
-    let c = feature["geometry"]["coordinates"].as_array().unwrap();
-    props.insert("lon".into(), c[0].clone());
-    props.insert("lat".into(), c[1].clone());
-    props
-}
-
-fn features(prefix: &str) -> Vec<Value> {
-    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../data");
-    let path = fs::read_dir(dir)
-        .unwrap()
-        .filter_map(Result::ok)
-        .map(|e| e.path())
-        .find(|p| p.file_name().unwrap().to_str().unwrap().starts_with(prefix))
-        .expect("asset");
-    let raw: Value = serde_json::from_str(&fs::read_to_string(path).unwrap()).unwrap();
-    raw["features"].as_array().cloned().unwrap()
-}
 
 /// Comparable row: the numbers a user actually reads, plus the name.
 ///
@@ -58,8 +39,7 @@ fn number(v: &Value) -> Option<f32> {
 const PINNED: [Region; 8] = Region::ALL;
 
 fn baseline() -> Map<String, Value> {
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/baseline.json");
-    serde_json::from_str(&fs::read_to_string(path).expect("baseline.json")).unwrap()
+    serde_json::from_str(&fs::read_to_string(support::fixture("baseline.json")).unwrap()).unwrap()
 }
 
 fn sorted(mut rows: Vec<Row>) -> Vec<Row> {
@@ -76,14 +56,7 @@ fn sorted(mut rows: Vec<Row>) -> Vec<Row> {
 
 #[test]
 fn shipped_regions_are_unchanged() {
-    let dcs: Vec<DataCenter> = features("datacenters.")
-        .iter()
-        .map(|f| serde_json::from_value(Value::Object(flatten(f))).unwrap())
-        .collect();
-    let sinks: Vec<Sink> = features("sinks.")
-        .iter()
-        .map(|f| serde_json::from_value(Value::Object(flatten(f))).unwrap())
-        .collect();
+    let (dcs, sinks) = support::committed();
     let names: std::collections::HashMap<String, String> =
         dcs.iter().map(|d| (d.id.clone(), d.name.clone())).collect();
     let engine = Engine::new(dcs, sinks, &[]).unwrap();

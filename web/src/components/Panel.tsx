@@ -5,10 +5,10 @@ import { useCallback, useEffect, useRef, type ReactNode } from "react";
 import { diffFromDefaults } from "@/lib/defaults";
 import { useFeatureIndex } from "@/lib/features";
 import { payback, score } from "@/lib/format";
-import { SHEET_SNAPS as SNAPS, useStore, type SheetSnap, type Theme } from "@/lib/store";
+import { SHEET_SNAPS as SNAPS, useSelectedMatch, useStore, type SheetSnap } from "@/lib/store";
 import { useLayoutMode } from "@/lib/useMedia";
 
-import { MonitorIcon, MoonIcon, SunIcon } from "./icons";
+import { ThemeButton } from "./TopBar";
 
 export type Tab = "results" | "tuning" | "detail";
 
@@ -19,35 +19,23 @@ const TAB_LABELS: Record<Tab, string> = {
 };
 
 const SNAP_ORDER: SheetSnap[] = ["peek", "half", "full"];
+const stepFrom = (snap: SheetSnap, dir: 1 | -1) =>
+  SNAP_ORDER[Math.max(0, Math.min(2, SNAP_ORDER.indexOf(snap) + dir))];
 /** Faster than this (px/ms) and a drag is a fling: snap in its direction. */
 const FLING = 0.5;
-
-const NEXT_THEME: Record<Theme, Theme> = { system: "dark", dark: "light", light: "system" };
-
-function ThemeButton() {
-  const theme = useStore((s) => s.theme);
-  const setTheme = useStore((s) => s.setTheme);
-  return (
-    <button className="icon-btn" aria-label={`Theme: ${theme}`} title={`Theme: ${theme}`} onClick={() => setTheme(NEXT_THEME[theme])}>
-      {theme === "dark" ? <MoonIcon /> : theme === "light" ? <SunIcon /> : <MonitorIcon />}
-    </button>
-  );
-}
 
 /** The one line worth reading while the sheet is down and the map is up. */
 function PeekSummary({ onOpen }: { onOpen: () => void }) {
   const engine = useStore((s) => s.engine);
-  const selectedDc = useStore((s) => s.selectedDc);
   const results = useStore((s) => s.results);
-  const { dcNames } = useFeatureIndex(engine);
-  const i = results.findIndex((m) => m.dc === selectedDc);
-  const m = i >= 0 ? results[i] : null;
+  const m = useSelectedMatch();
+  const { dcName } = useFeatureIndex(engine);
   return (
     <button className="peek" onClick={onOpen} aria-label="Open panel">
       {m ? (
         <>
-          <span className="faint num">#{i + 1}</span>
-          <b>{dcNames.get(m.dc) ?? m.dc}</b>
+          <span className="faint num">#{results.indexOf(m) + 1}</span>
+          <b>{dcName(m.dc)}</b>
           <span className="num">{score(m.score)}</span>
           <span className="num">{payback(m.payback_yrs)}</span>
         </>
@@ -93,16 +81,11 @@ export function Panel({
   const settle = useCallback(
     (h: number, v: number) => {
       const share = h / window.innerHeight;
-      let next: SheetSnap;
-      if (Math.abs(v) > FLING) {
-        // Fling: one step in its direction (up = taller).
-        const i = SNAP_ORDER.indexOf(
-          SNAP_ORDER.reduce((b, k) => (Math.abs(SNAPS[k] - share) < Math.abs(SNAPS[b] - share) ? k : b)),
-        );
-        next = SNAP_ORDER[Math.max(0, Math.min(2, i + (v < 0 ? 1 : -1)))];
-      } else {
-        next = SNAP_ORDER.reduce((b, k) => (Math.abs(SNAPS[k] - share) < Math.abs(SNAPS[b] - share) ? k : b));
-      }
+      const nearest = SNAP_ORDER.reduce((b, k) =>
+        Math.abs(SNAPS[k] - share) < Math.abs(SNAPS[b] - share) ? k : b,
+      );
+      // A fling steps one snap in its direction (up = taller).
+      const next = Math.abs(v) > FLING ? stepFrom(nearest, v < 0 ? 1 : -1) : nearest;
       const el = panelRef.current;
       if (el) {
         el.style.height = "";
@@ -253,13 +236,10 @@ export function Panel({
 
   // Read the current snap from the store, not the render: two quick taps
   // must step twice.
-  const step = (dir: 1 | -1) => {
-    const cur = useStore.getState().sheetSnap;
-    setSnap(SNAP_ORDER[Math.max(0, Math.min(2, SNAP_ORDER.indexOf(cur) + dir))]);
-  };
+  const step = (dir: 1 | -1) => setSnap(stepFrom(useStore.getState().sheetSnap, dir));
   const cycle = () => {
     const cur = useStore.getState().sheetSnap;
-    setSnap(cur === "peek" ? "half" : cur === "half" ? "full" : "peek");
+    setSnap(cur === "full" ? "peek" : stepFrom(cur, 1));
   };
 
   const tabs = Object.keys(TAB_LABELS) as Tab[];

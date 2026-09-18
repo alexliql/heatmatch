@@ -119,60 +119,33 @@ for the model and the sink carries `demand_note: "measured_fuel_near_zero"`. New
 York City reads its ComStock table for this alone; its footprint and category
 estimates are never replaced. In the current bundle it fired on no NYC building.
 
-### Constants and why they are what they are
+### Defaults
 
-Everything below is tunable in the app. The defaults are starting points, not
-findings.
+Every number below is a slider in the app; the defaults are starting points,
+not findings. They live in one place per layer — `Weights::default_for` and
+`Econ::default_for` in `core/heatmatch-core/src/weights.rs`, and `REGIONS` in
+`ingest/src/ingest/config.py` — with the reasoning beside each value.
 
-**Supply.** `utilization_hours = 0.9 × 8760`. Data centers run continuously;
-the 10% allows for downtime and load variation. `supply_mwh = mw × hours`.
-
-**Temperatures** (°C). Waste heat leaves at the temperature its cooling system
-implies — air 35, rear-door 42, liquid 55 — and must reach what the sink needs:
-pools 32, wastewater 35, greenhouses 40, breweries 50, hotels and apartments
-60, schools 70, hospitals, universities and offices 75. Cooling type is unknown
-for nearly every real site, so almost everything defaults to the least
-favourable case, 35 °C.
-
-**Heat pumps.** Where the lift is positive, `COP = carnot_fraction × T_hot /
-lift`, with `lift = required − supply + approach`, `approach = 5 K` and
-`carnot_fraction = 0.5` for a real machine against the ideal. A pairing needing
-a pump scores `COP / (COP + 1)` — the share of delivered energy that came from
-the waste heat rather than from the electricity meter. Low-temperature sinks
-therefore rank well: a pool needs almost no lift.
-
-**Category weights.** Pools 1.0, wastewater and greenhouses 0.9, hospitals 0.8,
-hotels 0.7, apartments 0.6, universities and breweries 0.5, schools and offices
-0.3. These follow temperature and steadiness: a pool wants low-grade heat all
-year, which is exactly what a data center has. An office wants high-grade heat
-only in winter.
-
-**Demand normalisation.** `log₁₀(1 + MWh)`, so a 1 GWh sink scores ~3 and a
-10 GWh sink ~4. Compressing demand this way keeps one enormous neighbour from
-swamping the category and distance signals.
-
-**Distance.** Default radius 1 km in the city, 4 km upstate, reflecting what a
-pipe trench can plausibly cost in each. Score decays linearly to zero at the
-radius. NYC uses rotated-L1 at 29° because Manhattan's grid runs about that far
-off true north and pipes follow streets; upstate uses a 1.2 detour factor.
-
-**Allocation.** No single sink may take more than 25% of a facility's supply,
-so one large neighbour cannot claim the whole site.
-
-**Zone bonuses.** +0.5 where data center and sink are both in the steam
-territory, +0.3 where either is in a thermal-network pilot: existing
-distribution and an existing regulatory path both make a scheme likelier.
-
-**Economics.** Pipe $3,000/m in the city and $800/m upstate; heat pumps
-$900,000 per MW thermal; gas $45/MWh against a boiler at 85%; electricity
-$150/MWh in the city, $90 upstate; $8/MWh of cooling the data center avoids.
-
-**Capacity estimates.** Where no capacity is published, it is derived from
-building floor area at 75 W/sq ft and **capped at 25 MW**. The cap exists
-because the area method assumes a whole building is white space: 111 8th Avenue
-came out at 162 MW, more than any facility in the state, purely as an artefact
-of a large mixed-use tower. Estimated capacities are flagged in the data as
-`mw_source`.
+- **Supply**: `mw × 0.9 × 8760` hours a year.
+- **Temperatures**: waste heat leaves at 35 °C (air), 42 (rear-door) or 55
+  (liquid); sinks need 32 (pools) up to 75 (hospitals, universities, offices).
+  Cooling type is unknown for nearly every site, so 35 °C is the usual case.
+- **Heat pumps**: `COP = 0.5 × T_hot / lift`, `lift = required − supply + 5 K`.
+  A pairing that needs a pump scores `COP / (COP + 1)`, the share of delivered
+  energy that came from waste heat rather than the meter.
+- **Category weights** follow temperature and steadiness: pools 1.0 down to
+  offices 0.3. Demand enters as `log₁₀(1 + MWh)` so one enormous neighbour
+  cannot swamp the other signals.
+- **Reach**: 1 km in Manhattan (rotated-L1 at 29°, because pipes follow the
+  street grid) to 4 km upstate; score decays linearly to zero at the radius.
+  No single sink may take more than 25% of a site's supply.
+- **Zone bonuses**: +0.5 when both ends are in the steam territory, +0.3 when
+  either is in a thermal-network pilot.
+- **Economics**: pipe $800–3,000/m by region; heat pumps $900k per MW thermal;
+  gas $40–55/MWh against an 85% boiler; electricity $80–210/MWh; $8/MWh of
+  avoided cooling.
+- **Capacity estimates** from floor area (75 W/sq ft in New York, 100–150
+  elsewhere) are capped per region; see "Known limitations".
 
 ## Virginia: methods and limitations
 

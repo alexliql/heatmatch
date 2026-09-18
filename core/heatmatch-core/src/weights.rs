@@ -1,8 +1,5 @@
-//! Tunable model parameters (HEATMATCH.md §4.2).
-//!
-//! Everything the UI exposes as a slider lives here. Defaults are per-region
-//! and must stay in step with `ingest/src/ingest/config.py`, which uses the
-//! same radius and pipe-cost figures.
+//! Tunable model parameters: everything the UI exposes as a slider. Per-region
+//! defaults must stay in step with `ingest/src/ingest/config.py`.
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -52,9 +49,9 @@ pub enum WaterPolicy {
 
 /// Per-category desirability weights.
 ///
-/// An explicit struct rather than a map: `serde_wasm_bindgen` turns Rust maps
-/// into a JS `Map`, which serializes to `{}` and is awkward to bind sliders to.
-/// A struct crosses the boundary as a plain object and types exactly.
+/// Flat structs rather than maps, here and in `ConfidenceWeights`:
+/// `serde_wasm_bindgen` turns a Rust map into a JS `Map`, which serializes to
+/// `{}` and cannot be bound to a slider.
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(tsify_next::Tsify))]
 #[cfg_attr(feature = "ts", tsify(into_wasm_abi, from_wasm_abi))]
@@ -72,39 +69,8 @@ pub struct CatWeights {
 }
 
 impl CatWeights {
-    pub fn get(&self, cat: SinkCat) -> f32 {
-        match cat {
-            SinkCat::Pool => self.pool,
-            SinkCat::Hospital => self.hospital,
-            SinkCat::University => self.university,
-            SinkCat::School => self.school,
-            SinkCat::Greenhouse => self.greenhouse,
-            SinkCat::Brewery => self.brewery,
-            SinkCat::Wwtp => self.wwtp,
-            SinkCat::Office => self.office,
-            SinkCat::ResidentialMultifamily => self.residential_multifamily,
-            SinkCat::Hotel => self.hotel,
-        }
-    }
-
-    pub fn set(&mut self, cat: SinkCat, value: f32) {
-        let slot = match cat {
-            SinkCat::Pool => &mut self.pool,
-            SinkCat::Hospital => &mut self.hospital,
-            SinkCat::University => &mut self.university,
-            SinkCat::School => &mut self.school,
-            SinkCat::Greenhouse => &mut self.greenhouse,
-            SinkCat::Brewery => &mut self.brewery,
-            SinkCat::Wwtp => &mut self.wwtp,
-            SinkCat::Office => &mut self.office,
-            SinkCat::ResidentialMultifamily => &mut self.residential_multifamily,
-            SinkCat::Hotel => &mut self.hotel,
-        };
-        *slot = value;
-    }
-
     pub fn iter(&self) -> impl Iterator<Item = (SinkCat, f32)> + '_ {
-        SinkCat::ALL.into_iter().map(|c| (c, self.get(c)))
+        SinkCat::ALL.into_iter().map(|c| (c, self[c]))
     }
 }
 
@@ -126,11 +92,24 @@ impl std::ops::Index<SinkCat> for CatWeights {
     }
 }
 
+impl std::ops::IndexMut<SinkCat> for CatWeights {
+    fn index_mut(&mut self, cat: SinkCat) -> &mut f32 {
+        match cat {
+            SinkCat::Pool => &mut self.pool,
+            SinkCat::Hospital => &mut self.hospital,
+            SinkCat::University => &mut self.university,
+            SinkCat::School => &mut self.school,
+            SinkCat::Greenhouse => &mut self.greenhouse,
+            SinkCat::Brewery => &mut self.brewery,
+            SinkCat::Wwtp => &mut self.wwtp,
+            SinkCat::Office => &mut self.office,
+            SinkCat::ResidentialMultifamily => &mut self.residential_multifamily,
+            SinkCat::Hotel => &mut self.hotel,
+        }
+    }
+}
+
 /// How much a data center's score is discounted for an uncertain capacity.
-///
-/// A flat struct rather than an `EnumMap`, for the same reason as `CatWeights`:
-/// `serde_wasm_bindgen` turns a Rust map into a JS `Map`, which serializes to
-/// `{}` and cannot be bound to a slider.
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(tsify_next::Tsify))]
 #[cfg_attr(feature = "ts", tsify(into_wasm_abi, from_wasm_abi))]
@@ -142,10 +121,8 @@ pub struct ConfidenceWeights {
 }
 
 impl ConfidenceWeights {
-    /// No discount at all — every grade trusted equally.
-    ///
-    /// This is what New York gets, and it is what keeps adding the confidence
-    /// model from moving a single existing number.
+    /// No discount at all — New York's default, where every capacity is
+    /// area-derived and grading guesses against guesses would be noise.
     pub const TRUSTING: Self = Self {
         reported: 1.0,
         filed: 1.0,
@@ -153,8 +130,7 @@ impl ConfidenceWeights {
         footprint_estimate: 1.0,
     };
 
-    /// The default outside New York: a published figure ranks ahead of an
-    /// inference of the same size.
+    /// The default elsewhere: a published figure ranks ahead of an inference.
     pub const GRADED: Self = Self {
         reported: 1.0,
         filed: 0.95,
@@ -162,27 +138,20 @@ impl ConfidenceWeights {
         footprint_estimate: 0.5,
     };
 
-    pub fn get(&self, c: MwConfidence) -> f32 {
-        match c {
-            MwConfidence::Reported => self.reported,
-            MwConfidence::Filed => self.filed,
-            MwConfidence::ParcelEstimate => self.parcel_estimate,
-            MwConfidence::FootprintEstimate => self.footprint_estimate,
-        }
-    }
-
-    pub fn set(&mut self, c: MwConfidence, value: f32) {
-        let slot = match c {
-            MwConfidence::Reported => &mut self.reported,
-            MwConfidence::Filed => &mut self.filed,
-            MwConfidence::ParcelEstimate => &mut self.parcel_estimate,
-            MwConfidence::FootprintEstimate => &mut self.footprint_estimate,
-        };
-        *slot = value;
-    }
-
     pub fn iter(&self) -> impl Iterator<Item = (MwConfidence, f32)> + '_ {
-        MwConfidence::ALL.into_iter().map(|c| (c, self.get(c)))
+        MwConfidence::ALL.into_iter().map(|c| (c, self[c]))
+    }
+}
+
+impl std::ops::Index<MwConfidence> for ConfidenceWeights {
+    type Output = f32;
+    fn index(&self, c: MwConfidence) -> &f32 {
+        match c {
+            MwConfidence::Reported => &self.reported,
+            MwConfidence::Filed => &self.filed,
+            MwConfidence::ParcelEstimate => &self.parcel_estimate,
+            MwConfidence::FootprintEstimate => &self.footprint_estimate,
+        }
     }
 }
 
@@ -275,9 +244,6 @@ impl Weights {
                 school: 0.3,
                 office: 0.3,
             },
-            // New York's capacities are uniformly area-derived, so grading them
-            // against each other would be noise. Everywhere else some sites
-            // publish real numbers, which is worth preferring over a guess.
             confidence: match region {
                 Region::Nyc | Region::Upstate => ConfidenceWeights::TRUSTING,
                 _ => ConfidenceWeights::GRADED,
@@ -292,10 +258,8 @@ impl Weights {
                 Region::La => 1500.0,
                 Region::Sac => 3000.0,
             },
-            // Manhattan's street grid runs ~29° off true north, so pipes
-            // there follow two axes rather than the diagonal. Upstate has no
-            // single orientation to exploit and gets a plain detour factor,
-            // matching ingest's per-region `detour` value.
+            // Manhattan's grid runs ~29° off true north, so pipes there follow
+            // two axes; everywhere else gets a plain detour factor.
             distance: match region {
                 Region::Nyc => DistanceModel::RotatedL1 { theta_deg: 29.0 },
                 Region::Upstate => DistanceModel::Detour { k: 1.20 },
@@ -311,9 +275,8 @@ impl Weights {
             uten_bonus: 0.3,
             per_sink_cap: 0.25,
             log_base: 10.0,
-            // Seattle's sinks sit across Lake Union, the Ship Canal and
-            // Elliott Bay from its data centers; a penalty would still let a
-            // pipe be drawn under Lake Washington, so there it is a hard no.
+            // Seattle: a penalty would still let a pipe run under Lake
+            // Washington, so a crossing is a hard no there.
             water_crossing: match region {
                 Region::Seattle => WaterPolicy::Exclude,
                 _ => WaterPolicy::Penalty { factor: 2.0 },
@@ -398,9 +361,6 @@ impl Econ {
                 Region::Sac => 50.0,
             },
             boiler_eff: 0.85,
-            // California is the highest-priced electricity on the map, and
-            // SMUD's municipal rates in Sacramento are well under the
-            // investor-owned utilities on the coast.
             elec_price_per_mwh: match region {
                 Region::Nyc => 150.0,
                 Region::Upstate => 90.0,
