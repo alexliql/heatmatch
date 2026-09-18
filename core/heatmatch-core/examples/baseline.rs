@@ -46,7 +46,7 @@ fn main() {
 
     let mut out = Map::new();
     // Every shipped region. Keep in step with `PINNED` in tests/regression.rs.
-    for region in [Region::Nyc, Region::Upstate, Region::Nova] {
+    for region in Region::ALL {
         let ranked = engine
             .rank(
                 region,

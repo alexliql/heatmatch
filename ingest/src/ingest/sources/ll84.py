@@ -12,8 +12,9 @@ from urllib.parse import quote
 
 from pyproj import Geod
 
-from ingest.config import BOILER_EFF, KBTU_TO_KWH, LL84_JOIN_M, LL84_URL
+from ingest.config import LL84_JOIN_M, LL84_URL
 from ingest.sources.fetch import cached_get
+from ingest.sources.measured import entry_from_kbtu
 
 _GEOD = Geod(ellps="WGS84")
 
@@ -63,21 +64,9 @@ def _by_bbl_cached(refresh: bool) -> dict[str, dict]:
 
 def _entry(row: dict) -> dict | None:
     """One disclosure row as delivered heat, or None if it reports no heating."""
-    fuel_kbtu = sum(_number(row.get(f)) for f in _FUEL_FIELDS)
-    steam_kbtu = _number(row.get(_STEAM_FIELD))
-    total = fuel_kbtu + steam_kbtu
-    if total <= 0:
-        return None
-    # A building heated mostly by district steam already has its heat; §3.3
-    # drops these from the dataset entirely.
-    #
-    # LL84 reports fuel bought, not heat delivered. The engine prices heat and
-    # divides by boiler efficiency to recover the fuel avoided, so the fuel has
-    # to become heat here or the 1/0.85 is applied twice.
-    return {
-        "demand_kwh": fuel_kbtu * KBTU_TO_KWH * BOILER_EFF,
-        "steam_heated": steam_kbtu > 0.5 * total,
-    }
+    return entry_from_kbtu(
+        sum(_number(row.get(f)) for f in _FUEL_FIELDS), _number(row.get(_STEAM_FIELD))
+    )
 
 
 def by_bbl(*, refresh: bool = False) -> dict[str, dict]:

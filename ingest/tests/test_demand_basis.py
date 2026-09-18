@@ -36,11 +36,14 @@ def test_heat_pump_cop_matches_the_engine_constant() -> None:
 TABLE = {"LargeOffice": {"kwh_per_m2": 40.0, "counterfactual": "electric_resistance"}}
 
 
-def _measured(kwh_per_m2: float, area_m2: float = 20_000.0, source: str = "ll84_fuel") -> dict:
+def _measured(
+    kwh_per_m2: float, floor_area_m2: float = 20_000.0, source: str = "ll84_fuel"
+) -> dict:
     return {
         "cat": "office",
-        "area_m2": area_m2,
-        "demand_kwh": kwh_per_m2 * area_m2,
+        "area_m2": floor_area_m2 / 8,
+        "floor_area_m2": floor_area_m2,
+        "demand_kwh": kwh_per_m2 * floor_area_m2,
         "demand_source": source,
     }
 
@@ -121,3 +124,40 @@ def test_the_shipped_new_york_bundle_is_all_gas_where_untouched() -> None:
         p = f["properties"]
         if p["region"] in ("nyc", "upstate") and p.get("demand_note") != "measured_fuel_near_zero":
             assert p.get("counterfactual", "gas") == "gas", p["id"]
+
+
+def test_the_model_never_overwrites_a_measurement(monkeypatch) -> None:
+    """Seattle exposed this: benchmarking joined first, then ComStock replaced
+    it, because the modelling loop never asked where the number came from."""
+    from ingest.merge import sinks as merge_sinks
+    from ingest.sources import comstock
+
+    monkeypatch.setattr(
+        comstock,
+        "build",
+        lambda region, refresh=False: {"by_type": {"LargeOffice": {"kwh_per_m2": 40.0}}},
+    )
+    measured = {
+        "cat": "office",
+        "floor_area_m2": 20_000.0,
+        "demand_kwh": 900_000.0,
+        "demand_source": "seattle_bench",
+        "steam_heated": False,
+    }
+    modelled = {
+        "cat": "office",
+        "floor_area_m2": 20_000.0,
+        "demand_kwh": 1.0,
+        "demand_source": "footprint_estimate",
+        "steam_heated": False,
+    }
+    rows = [measured, modelled]
+    table = comstock.build("seattle")["by_type"]
+    for row in rows:
+        if row["demand_source"] in merge_sinks._MEASURED:
+            continue
+        got = comstock.demand_kwh(row["cat"], row["floor_area_m2"], table)
+        if got:
+            row["demand_kwh"], row["demand_source"] = got
+    assert measured["demand_kwh"] == 900_000.0 and measured["demand_source"] == "seattle_bench"
+    assert modelled["demand_source"] == "comstock_modeled" and modelled["demand_kwh"] == 800_000.0

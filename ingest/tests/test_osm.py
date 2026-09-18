@@ -2,7 +2,7 @@
 
 import pytest
 
-from ingest.config import MIN_AREA_M2, min_area_for
+from ingest.config import FLOORS_GUESS, MIN_AREA_M2, min_area_for
 from ingest.sources.osm import _dedupe, _footprint, _query
 
 ANCHORS = [(40.7128, -74.0060), (40.75, -73.99)]
@@ -100,10 +100,12 @@ def test_virginia_gates_out_back_garden_pools() -> None:
     pools — 544 of 588 matches were unnamed with a median area of 81 m2, while
     the named community pools start around 330 m2.
     """
-    assert min_area_for("nova")["pool"] == 250.0
+    for region in ("nova", "seattle", "pdx", "svy", "la", "sac"):
+        assert min_area_for(region)["pool"] == 250.0, region
     # New York has the same problem but is deliberately left alone: changing it
     # would move already-published results.
     assert "pool" not in min_area_for("nyc")
+    assert "pool" not in min_area_for("upstate")
     # The other gates carry over rather than being replaced wholesale.
     assert min_area_for("nova")["office"] == min_area_for("nyc")["office"]
 
@@ -115,3 +117,15 @@ def test_a_gated_category_does_not_ask_overpass_for_nodes() -> None:
     assert "node" not in _query("pool", anchors, 3000.0, min_area_for("nova"))
     # Ungated elsewhere, where a pool mapped as a point is still worth having.
     assert "node" in _query("pool", anchors, 3000.0, min_area_for("nyc"))
+
+
+def test_a_polygon_sink_carries_its_floor_area() -> None:
+    """`area_m2` is the footprint OpenStreetMap draws; `floor_area_m2` is what
+    a per-square-metre intensity wants. Storeys come from `building:levels`."""
+    from ingest.sources.osm import _floors
+
+    assert _floors({"building:levels": "28"}, "office") == 28.0
+    # No tag: the category's guess, which for an office is several storeys.
+    assert _floors({}, "office") == FLOORS_GUESS["office"] > 1.0
+    # A malformed tag falls back rather than failing.
+    assert _floors({"building:levels": "many"}, "school") == FLOORS_GUESS["school"]

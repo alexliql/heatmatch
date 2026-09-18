@@ -69,16 +69,37 @@ export function About({ open, onClose }: { open: boolean; onClose: () => void })
               {lastRankMs.toFixed(1)} ms
             </p>
             <ul style={{ marginTop: 8 }}>
-              {manifest.sources.map((s) => (
-                <li key={s.id}>
-                  <a href={s.url} target="_blank" rel="noreferrer">
-                    <code>{s.id}</code>
-                  </a>{" "}
-                  <span className="faint">({s.license})</span>
-                  {s.note ? <> — {s.note}</> : null}
-                </li>
-              ))}
+              {manifest.sources
+                .filter((s) => !s.status)
+                .map((s) => (
+                  <li key={s.id}>
+                    <a href={s.url} target="_blank" rel="noreferrer">
+                      <code>{s.id}</code>
+                    </a>{" "}
+                    <span className="faint">({s.license})</span>
+                    {s.note ? <> — {s.note}</> : null}
+                  </li>
+                ))}
             </ul>
+            {manifest.sources.some((s) => s.status) && (
+              <>
+                <p className="faint" style={{ marginTop: 10 }}>
+                  Checked and not used — the reasons are part of the record:
+                </p>
+                <ul>
+                  {manifest.sources
+                    .filter((s) => s.status)
+                    .map((s) => (
+                      <li key={s.id} className="faint">
+                        <a href={s.url} target="_blank" rel="noreferrer">
+                          <code>{s.id}</code>
+                        </a>
+                        {s.note ? <> — {s.note}</> : null}
+                      </li>
+                    ))}
+                </ul>
+              </>
+            )}
           </div>
         )}
 

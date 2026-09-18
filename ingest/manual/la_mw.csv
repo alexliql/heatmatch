@@ -1,0 +1,8 @@
+# Curated capacities for Los Angeles data centers. Same columns and rules as
+# nova_mw.csv: match_key, mw, scope, mw_confidence, source_url, source_date,
+# note. Rows still marked UNVERIFIED are used for their value but emitted as
+# estimates until a person reads the source and removes the word.
+#
+match_key,mw,scope,mw_confidence,source_url,source_date,note
+Digital Realty LAX10,27,building,reported,https://www.digitalrealty.com/data-centers/americas/los-angeles/lax10,2026-09-18,UNVERIFIED — operator page states 27 MW for the 600 W 7th St facility.
+CoreSite LA3,18,building,reported,https://www.coresite.com/data-center/la3-los-angeles-ca,2026-09-18,UNVERIFIED — operator page states 18 MW at full build; first phase was 6 MW (2020). Planned capacity may exceed what is energised.

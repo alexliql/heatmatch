@@ -4,7 +4,7 @@ from ingest.config import RegionName
 from ingest.merge.dedupe import merge
 from ingest.merge.emit import assign_ids
 from ingest.schema import DataCenter
-from ingest.sources import nova_mw, nys_parcels, pluto, pnnl, zones
+from ingest.sources import curated_mw, nys_parcels, pluto, pnnl, seed_dcs, zones
 
 
 def build(
@@ -16,11 +16,15 @@ def build(
         raw += list(pnnl.candidates(region, refresh=refresh))
         raw += list(pluto.candidates(region, refresh=refresh))
         raw += list(nys_parcels.candidates(region, refresh=refresh))
+        raw += list(seed_dcs.candidates(region, refresh=refresh))
 
     rows = [zones.tag(r) for r in merge(raw)]
     # Applied after dedupe: a curated figure covers a facility, and which rows
     # are one facility is only settled once duplicates have been merged.
-    curated = nova_mw.apply(rows) if "nova" in regions else {"rows": 0, "buildings": 0, "unmatched": 0}
+    curated = {"rows": 0, "buildings": 0, "unmatched": 0}
+    for region in regions:
+        for key, n in curated_mw.apply(rows, region).items():
+            curated[key] += n
     # Source-only bookkeeping; the schema does not carry it.
     for r in rows:
         r.pop("_address", None)

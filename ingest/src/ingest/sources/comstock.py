@@ -38,14 +38,17 @@ visible.
 from __future__ import annotations
 
 import calendar
+import json
 from collections.abc import Iterator
 from functools import lru_cache
+from pathlib import Path
 
 import pandas as pd
 
 from ingest.config import (
     BOILER_EFF,
     COMSTOCK_BASE_URL,
+    COMSTOCK_FALLBACK_REGIONS,
     COMSTOCK_LARGE_OFFICE_M2,
     COMSTOCK_MIN_SAMPLES,
     COMSTOCK_PROFILE_TYPE_BY_CAT,
@@ -298,41 +301,46 @@ def build(region: RegionName, *, refresh: bool = False) -> dict:
     }
 
 
-def comstock_type(cat: SinkCat, area_m2: float | None) -> str | None:
+def comstock_type(cat: SinkCat, floor_area_m2: float | None) -> str | None:
     """The ComStock type standing in for a sink, or None if there is no match.
 
     Offices are split by size here rather than in the mapping table: ComStock
     models small, medium and large offices separately and they differ by more
     than a factor of two, so which one a building resembles depends on the
-    building.
+    building. Size means floor area — a 3,000 m2 footprint is a medium office
+    at one storey and a large one at ten.
     """
     if cat == "office":
-        if area_m2 is None:
+        if floor_area_m2 is None:
             return None
-        return "LargeOffice" if area_m2 > COMSTOCK_LARGE_OFFICE_M2 else "MediumOffice"
+        return "LargeOffice" if floor_area_m2 > COMSTOCK_LARGE_OFFICE_M2 else "MediumOffice"
     return COMSTOCK_TYPE_BY_CAT.get(cat)
 
 
 def demand_kwh(
-    cat: SinkCat, area_m2: float | None, table: dict[str, dict]
+    cat: SinkCat, floor_area_m2: float | None, table: dict[str, dict]
 ) -> tuple[float, str] | None:
     """Modelled annual heating demand for one sink, or None if unmodellable.
+
+    `floor_area_m2`, not the footprint: the intensity is per square metre of
+    floor. Applying it to the ground area put a 28-storey Seattle tower at
+    96 MWh a year, which is how this was caught.
 
     Returns `(kwh, "comstock_modeled")` so callers can fall through to the
     footprint or category estimate exactly as they do for an unjoined LL84 row.
     """
-    if not area_m2 or area_m2 <= 0:
+    if not floor_area_m2 or floor_area_m2 <= 0:
         return None
-    building_type = comstock_type(cat, area_m2)
+    building_type = comstock_type(cat, floor_area_m2)
     entry = table.get(building_type) if building_type else None
     if entry is None:
         return None
-    return area_m2 * entry["kwh_per_m2"], "comstock_modeled"
+    return floor_area_m2 * entry["kwh_per_m2"], "comstock_modeled"
 
 
-def intensity_for(cat: SinkCat, area_m2: float | None, table: dict[str, dict]) -> dict | None:
+def intensity_for(cat: SinkCat, floor_area_m2: float | None, table: dict[str, dict]) -> dict | None:
     """The ComStock entry standing in for a sink, or None if there is none."""
-    building_type = comstock_type(cat, area_m2)
+    building_type = comstock_type(cat, floor_area_m2)
     return table.get(building_type) if building_type else None
 
 
@@ -347,6 +355,31 @@ def profiles_for_region(table: dict[str, dict]) -> dict[str, list[float]]:
         entry = table.get(building_type)
         if entry and entry.get("monthly"):
             out[cat] = entry["monthly"]
+    return out
+
+
+DERIVED = Path(__file__).resolve().parents[3] / "derived"
+
+
+def write_derived(regions: list[RegionName], *, refresh: bool = False) -> list[Path]:
+    """Write `derived/<state>_intensity.json`, one file per state, keyed by region.
+
+    Committed for reproducibility: the parquet inputs are ~75 MB a region and
+    are not, but the fourteen numbers per building type that come out of them
+    are what every modelled demand rests on, and they belong in the diff.
+    """
+    by_state: dict[str, dict] = {}
+    for region in regions:
+        if region not in COMSTOCK_FALLBACK_REGIONS:
+            continue
+        state = str(REGIONS[region]["state_abb"]).lower()
+        by_state.setdefault(state, {})[region] = build(region, refresh=refresh)
+    DERIVED.mkdir(exist_ok=True)
+    out = []
+    for state, tables in sorted(by_state.items()):
+        path = DERIVED / f"{state}_intensity.json"
+        path.write_text(json.dumps(tables, indent=2, sort_keys=True) + "\n")
+        out.append(path)
     return out
 
 

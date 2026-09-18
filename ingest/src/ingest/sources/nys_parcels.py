@@ -43,7 +43,11 @@ def candidates(region: RegionName, *, refresh: bool = False) -> Iterator[dict]:
             lat, lon, mw = float(row["lat"]), float(row["lon"]), float(row["mw"])
         except (KeyError, ValueError):
             continue
-        if mw <= 0 or region_for(lat, lon) != "upstate" or not in_region_boundary(lat, lon, "upstate"):
+        if (
+            mw <= 0
+            or region_for(lat, lon) != "upstate"
+            or not in_region_boundary(lat, lon, "upstate")
+        ):
             continue
 
         yield {

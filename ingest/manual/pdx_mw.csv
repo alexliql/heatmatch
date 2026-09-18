@@ -1,0 +1,13 @@
+# Curated capacities for Portland-metro (Hillsboro) data centers. Same columns
+# and rules as nova_mw.csv. Rows marked UNVERIFIED are used for their value but
+# emitted as estimates until a person reads the source.
+#
+# Hillsboro figures are overwhelmingly *planned campus* capacity from
+# announcements, which exceeds what is built. The rows here are restricted to
+# campuses whose buildings the Atlas already maps, so the split lands on real
+# structures; a campus total is still likely above what is energised.
+#
+match_key,mw,scope,mw_confidence,source_url,source_date,note
+QTS Data Center Bld,250,campus,reported,https://www.prnewswire.com/news-releases/qts-announces-development-of-mega-data-center-on-250-megawatt-hillsboro-oregon-campus-301007028.html,2026-09-18,UNVERIFIED — operator release: 250 MW campus across five buildings; the Atlas maps all five. Planned capacity; likely above what is energised.
+Stack Infrastructure Portland,200,campus,reported,https://www.datacenterdynamics.com/en/news/data-center-developer-stack-to-expand-hillsboro-campus-by-121mw/,2026-09-18,UNVERIFIED — reported as a 200 MW POR03 campus after a 121 MW expansion; the Atlas maps four buildings. Planned capacity.
+Flexential Portland - Hillsboro,54,campus,reported,https://www.flexential.com/resources/press-release/flexential-secures-strategic-real-estate-ownership-hillsboro-oregon,2026-09-18,UNVERIFIED — operator release describes 54 MW added at Hillsboro, its largest campus; taken as the campus figure across the mapped buildings 1–5. Conservative if the campus is larger.

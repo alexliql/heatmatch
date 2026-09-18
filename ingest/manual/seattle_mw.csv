@@ -1,0 +1,9 @@
+# Curated capacities for Seattle-area data centers. Same columns and rules as
+# nova_mw.csv. Rows marked UNVERIFIED are used for their value but emitted as
+# estimates until a person reads the source.
+#
+# The Westin Building Exchange publishes no capacity figure; it stays an
+# area-derived estimate.
+#
+match_key,mw,scope,mw_confidence,source_url,source_date,note
+Intergate Seattle,54,campus,reported,https://sabeydatacenters.com/locations/seattle-data-center,2026-09-18,UNVERIFIED — operator site states 54 MW across the Tukwila campus (Intergate East and West buildings); split across the Atlas's nine buildings by footprint.

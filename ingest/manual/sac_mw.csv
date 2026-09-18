@@ -1,0 +1,6 @@
+# Curated capacities for Sacramento data centers. Same columns and rules as
+# nova_mw.csv. Rows marked UNVERIFIED are used for their value but emitted as
+# estimates until a person reads the source.
+#
+match_key,mw,scope,mw_confidence,source_url,source_date,note
+Prime Data Centers SMF01-01,8,building,reported,https://primedatacenters.com/locations/sacramento/,2026-09-18,UNVERIFIED — operator page states 8 MW, operational.

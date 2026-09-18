@@ -1,0 +1,19 @@
+# Seeded Seattle data centers — sites the Atlas maps thinly or as the wrong thing.
+#
+# Columns: name, lat, lon, operator, density, sqft, source_url, source_date, note
+#   density   purpose_built (150 W/sq ft) or carrier_hotel (75 W/sq ft, since a
+#             downtown tower is mostly offices with some floors of colo).
+#   sqft      Stated floor area from the operator, NOT a footprint. The Atlas
+#             maps the Westin Building as a 13,117 sq ft footprint; it is a
+#             34-storey tower.
+#
+# A seed that duplicates an Atlas building (75 m, similar name) is merged with
+# it, and the larger area-derived estimate wins. The result is still an
+# estimate (mw_confidence=footprint_estimate); a row in wa_mw.csv can lift it.
+#
+# Deliberately NOT seeded, because they are inside the Westin Building and
+# would double-count it: Equinix SE2 (Suite 1202) and Digital Realty SEA10.
+#
+name,lat,lon,operator,density,sqft,source_url,source_date,note
+Westin Building Exchange,47.6144,-122.3389,Clise / Digital Realty,carrier_hotel,400400,https://www.westinbldg.com/,2026-09-17,Operator site states 400,400 sq ft of data center / colocation / office space; carrier hotel since 1995; exports heat to the Amazon campus opposite.
+Equinix SE3,47.6144,-122.3397,Equinix,purpose_built,51000,https://www.equinix.com/newsroom/press-releases/2013/03/equinix-opens-second-seattle-data-center,2026-09-17,2020 Fifth Ave; opening press release states ~51,000 sq ft of data center space.

@@ -53,9 +53,9 @@ fn number(v: &Value) -> Option<f32> {
     }
 }
 
-/// Regions the snapshot pins. Extended as regions ship; each addition is a
-/// deliberate regeneration of the fixture.
-const PINNED: [Region; 3] = [Region::Nyc, Region::Upstate, Region::Nova];
+/// Regions the snapshot pins: every shipped one. A new region is pinned once
+/// its ranking has been reviewed, by a deliberate regeneration of the fixture.
+const PINNED: [Region; 8] = Region::ALL;
 
 fn baseline() -> Map<String, Value> {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/baseline.json");

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 import { useStore } from "@/lib/store";
 import { BUCKET_LABELS, SINK_VARS, cssVar, km } from "@/lib/format";
-import { CAT_LABELS, SINK_CATS } from "@/lib/types";
+import { CAT_LABELS, SINK_CATS, ZONE_LABELS } from "@/lib/types";
 
 import { ChevronIcon } from "./icons";
 
@@ -19,6 +19,11 @@ export function Legend() {
   const results = useStore((s) => s.results);
   const weights = useStore((s) => s.weights);
   const hasZones = useStore((s) => Boolean(s.engine?.geo.zones));
+  const viewRegion = useStore((s) => s.viewRegion);
+  // Which territory is on screen. In the "All" view every drawn zone is, so
+  // the generic label is the honest one.
+  const zoneLabel =
+    viewRegion === "all" ? "District heating territory" : ZONE_LABELS[viewRegion];
   // True once any site carries a stated capacity, which is what makes the
   // solid-versus-outline distinction on the map mean anything.
   const hasEstimates = useStore((s) => {
@@ -107,10 +112,10 @@ export function Legend() {
             <span>Heat sinks</span>
           </div>
 
-          {hasZones && (
+          {hasZones && zoneLabel && (
             <div className="legend-row">
               <i className="zone" />
-              <span>District heating territory</span>
+              <span>{zoneLabel}</span>
             </div>
           )}
 

@@ -1,4 +1,4 @@
-"""Curated capacities for Northern Virginia, from public statements and filings.
+"""Curated capacities from public statements and filings, one file per region.
 
 Everything else in this pipeline infers capacity from building area. Where an
 operator, a county approval or a utility filing states a real number, that is
@@ -25,13 +25,13 @@ from pathlib import Path
 
 from ingest.config import RegionName
 
-MANUAL = Path(__file__).resolve().parents[3] / "manual" / "nova_mw.csv"
+MANUAL = Path(__file__).resolve().parents[3] / "manual"
 
-NOVA_MW_SOURCE = {
-    "id": "manual_nova_mw",
-    "url": "https://github.com/alexliql/heatmatch/blob/main/ingest/manual/nova_mw.csv",
+CURATED_MW_SOURCE = {
+    "id": "manual_curated_mw",
+    "url": "https://github.com/alexliql/heatmatch/tree/main/ingest/manual",
     "license": "CC0-1.0",
-    "note": "Hand-curated Northern Virginia capacities; per-row provenance in the file.",
+    "note": "Hand-curated capacities, one <region>_mw.csv per region; per-row provenance in each file.",
 }
 
 # A row still carrying this marker has not been read by a person, so its value
@@ -44,10 +44,11 @@ def normalize(name: str) -> str:
     return re.sub(r"[^a-z0-9]+", " ", name.lower()).strip()
 
 
-def _rows() -> list[dict]:
-    if not MANUAL.exists():
+def _rows(region: RegionName) -> list[dict]:
+    path = MANUAL / f"{region}_mw.csv"
+    if not path.exists():
         return []
-    with MANUAL.open(newline="") as fh:
+    with path.open(newline="") as fh:
         # The file is heavily commented; DictReader has no comment support, so
         # blank and '#' lines are dropped before it sees them.
         lines = [ln for ln in fh if ln.strip() and not ln.lstrip().startswith("#")]
@@ -61,13 +62,13 @@ def _rows() -> list[dict]:
     return out
 
 
-def apply(dcs: list[dict], region: RegionName = "nova") -> dict[str, int]:
+def apply(dcs: list[dict], region: RegionName) -> dict[str, int]:
     """Overwrite `mw` in place where a curated figure covers a data center.
 
     Returns counts for the CLI summary. Mutates `dcs` rather than returning a
     new list, matching how `ll84.attach` revises sink demand.
     """
-    rows = _rows()
+    rows = _rows(region)
     stats = {"rows": len(rows), "buildings": 0, "unmatched": 0}
     if not rows:
         return stats
@@ -101,7 +102,7 @@ def apply(dcs: list[dict], region: RegionName = "nova") -> dict[str, int]:
                 d.update(mw=row["mw"] * share, mw_source=source, campus_id=campus)
 
         for d in matched:
-            d.setdefault("sources", []).append(NOVA_MW_SOURCE["id"])
+            d.setdefault("sources", []).append(CURATED_MW_SOURCE["id"])
         stats["buildings"] += len(matched)
 
     return stats

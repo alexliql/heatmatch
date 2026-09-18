@@ -20,7 +20,17 @@ NAME_RATIO = 70
 # The Atlas is a curated dataset with real facility names, while PLUTO gives a
 # lot's owner. Prefer the Atlas for identity and capacity where both describe
 # the same site.
-_SOURCE_RANK = {"im3_datacenter_atlas": 0, "nyc_pluto": 1, "nys_parcels": 2}
+# A seed ranks with the Atlas, not below it. Both are area-derived estimates,
+# and when they describe the same building the seed's *stated floor area* is
+# the better one: the Atlas maps a footprint, which for a 34-storey carrier
+# hotel like the Westin Building is a thirtieth of the floor space. Equal rank
+# lets the larger estimate win, per the rule below.
+_SOURCE_RANK = {
+    "im3_datacenter_atlas": 0,
+    "manual_seed_dcs": 0,
+    "nyc_pluto": 1,
+    "nys_parcels": 2,
+}
 
 
 def _rank(row: dict) -> int:

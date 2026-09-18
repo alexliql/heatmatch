@@ -1,0 +1,29 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "kind": "steam",
+        "name": "Enwave Seattle",
+        "approximate": true,
+        "note": "Hand-drawn approximation of Enwave Seattle's district steam service area: the downtown core from Denny Way south through Pioneer Square, and First Hill. Not authoritative; Enwave publishes no service-area geodata. The Westin Building Exchange and Amazon's campus sit at its northern edge."
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [-122.346, 47.619],
+          [-122.326, 47.619],
+          [-122.318, 47.614],
+          [-122.311, 47.611],
+          [-122.311, 47.603],
+          [-122.320, 47.598],
+          [-122.330, 47.596],
+          [-122.340, 47.597],
+          [-122.346, 47.604],
+          [-122.346, 47.619]
+        ]]
+      }
+    }
+  ]
+}

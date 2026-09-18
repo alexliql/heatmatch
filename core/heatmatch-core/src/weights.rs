@@ -153,6 +153,15 @@ impl ConfidenceWeights {
         footprint_estimate: 1.0,
     };
 
+    /// The default outside New York: a published figure ranks ahead of an
+    /// inference of the same size.
+    pub const GRADED: Self = Self {
+        reported: 1.0,
+        filed: 0.95,
+        parcel_estimate: 0.7,
+        footprint_estimate: 0.5,
+    };
+
     pub fn get(&self, c: MwConfidence) -> f32 {
         match c {
             MwConfidence::Reported => self.reported,
@@ -267,21 +276,21 @@ impl Weights {
                 office: 0.3,
             },
             // New York's capacities are uniformly area-derived, so grading them
-            // against each other would be noise. Virginia publishes real numbers
-            // for some sites, which is worth preferring over a footprint guess.
+            // against each other would be noise. Everywhere else some sites
+            // publish real numbers, which is worth preferring over a guess.
             confidence: match region {
                 Region::Nyc | Region::Upstate => ConfidenceWeights::TRUSTING,
-                Region::Nova => ConfidenceWeights {
-                    reported: 1.0,
-                    filed: 0.95,
-                    parcel_estimate: 0.7,
-                    footprint_estimate: 0.5,
-                },
+                _ => ConfidenceWeights::GRADED,
             },
             radius_m: match region {
                 Region::Nyc => 1000.0,
                 Region::Upstate => 4000.0,
                 Region::Nova => 3000.0,
+                Region::Seattle => 1500.0,
+                Region::Pdx => 2500.0,
+                Region::Svy => 2000.0,
+                Region::La => 1500.0,
+                Region::Sac => 3000.0,
             },
             // Manhattan's street grid runs ~29° off true north, so pipes
             // there follow two axes rather than the diagonal. Upstate has no
@@ -291,13 +300,24 @@ impl Weights {
                 Region::Nyc => DistanceModel::RotatedL1 { theta_deg: 29.0 },
                 Region::Upstate => DistanceModel::Detour { k: 1.20 },
                 Region::Nova => DistanceModel::Detour { k: 1.25 },
+                Region::Seattle => DistanceModel::Detour { k: 1.30 },
+                Region::Pdx => DistanceModel::Detour { k: 1.25 },
+                Region::Svy => DistanceModel::Detour { k: 1.25 },
+                Region::La => DistanceModel::Detour { k: 1.30 },
+                Region::Sac => DistanceModel::Detour { k: 1.20 },
             },
             decay: Decay::Linear,
             steam_bonus: 0.5,
             uten_bonus: 0.3,
             per_sink_cap: 0.25,
             log_base: 10.0,
-            water_crossing: WaterPolicy::Penalty { factor: 2.0 },
+            // Seattle's sinks sit across Lake Union, the Ship Canal and
+            // Elliott Bay from its data centers; a penalty would still let a
+            // pipe be drawn under Lake Washington, so there it is a hard no.
+            water_crossing: match region {
+                Region::Seattle => WaterPolicy::Exclude,
+                _ => WaterPolicy::Penalty { factor: 2.0 },
+            },
             approach_c: 5.0,
             hp_carnot_fraction: 0.5,
             utilization_hours: 0.9 * 8760.0,
@@ -364,17 +384,32 @@ impl Econ {
                 Region::Nyc => 3000.0,
                 Region::Upstate => 800.0,
                 Region::Nova => 1200.0,
+                Region::Seattle => 2500.0,
+                Region::Pdx => 1500.0,
+                Region::Svy => 2500.0,
+                Region::La => 3000.0,
+                Region::Sac => 1200.0,
             },
             hp_capex_per_mw_th: 900_000.0,
             gas_price_per_mwh_th: match region {
-                Region::Nyc | Region::Upstate => 45.0,
+                Region::Nyc | Region::Upstate | Region::Seattle | Region::Pdx => 45.0,
                 Region::Nova => 40.0,
+                Region::Svy | Region::La => 55.0,
+                Region::Sac => 50.0,
             },
             boiler_eff: 0.85,
+            // California is the highest-priced electricity on the map, and
+            // SMUD's municipal rates in Sacramento are well under the
+            // investor-owned utilities on the coast.
             elec_price_per_mwh: match region {
                 Region::Nyc => 150.0,
                 Region::Upstate => 90.0,
                 Region::Nova => 80.0,
+                Region::Seattle => 90.0,
+                Region::Pdx => 85.0,
+                Region::Svy => 200.0,
+                Region::La => 210.0,
+                Region::Sac => 140.0,
             },
             dc_avoided_cooling_per_mwh: 8.0,
         }

@@ -3,9 +3,11 @@
 Ranks data centers by how well their waste heat could be reused by nearby heat
 consumers — pools, hospitals, greenhouses, wastewater plants and so on.
 
-Three regions: **New York City**, **Upstate New York**, and **Northern
-Virginia** — Loudoun, Prince William, Fairfax, Arlington, Alexandria, Manassas
-and Manassas Park, the largest data center cluster in the world.
+Eight regions across five states: **New York City** and **Upstate New York**;
+**Northern Virginia** (Loudoun, Prince William, Fairfax, Arlington, Alexandria,
+Manassas and Manassas Park — the largest data center cluster in the world);
+**Seattle**; **Portland**; and three California metros — **Silicon Valley**,
+**Los Angeles** and **Sacramento**.
 
 The whole thing is a static site. Data is prepared offline by a Python pipeline
 and committed as GeoJSON; the scoring engine is Rust compiled to WebAssembly and
@@ -257,6 +259,110 @@ correctly reports 0% of Virginia capacity as stated.
   **New York has the same problem and is deliberately left ungated** — 76% of
   NYC pool matches are under 250 m², median 21 m² — because fixing it would move
   already-published New York results. See the note in `config.py`.
+
+## Washington, Oregon, California: methods and limitations
+
+The West Coast regions reuse everything Virginia introduced — modelled demand,
+graded capacity, region-prefixed ids — and add two things: **measured demand
+from city and state benchmarking programmes**, and the **counterfactual** on
+every sink, which is what makes an electrically heated building on the West
+Coast readable as a sink at all.
+
+### Where the demand comes from
+
+| Region | Measured source | Coverage | Everything else |
+|---|---|---|---|
+| Seattle | City of Seattle Building Energy Benchmarking (`seattle_bench`) | Seattle city limits, ≥ 20,000 sq ft; ~half of Seattle's sinks | ComStock, WA counties |
+| Portland | none — see below | — | ComStock, OR counties |
+| Silicon Valley, Los Angeles, Sacramento | California AB 802 public disclosure (`ab802`) | Statewide, ≥ 50,000 sq ft | ComStock, per region's counties |
+
+Two programmes were verified and deliberately not used; both decisions are in
+`manifest.json` under `sources` with a `status`, so they are on the record next
+to the sources that were:
+
+- **Portland's Energy Performance Reporting** does break out natural gas, but
+  publishes addresses and tax-lot ids with no coordinates, and covers Portland
+  city limits only — the data centers are in Hillsboro. Portland's sinks are
+  ComStock-modelled.
+- **Los Angeles's EBEWE disclosure** carries site and source EUI only, with no
+  fuel breakdown and no coordinates. AB 802 covers the same city's buildings of
+  50,000 sq ft and up with separate fuel fields and geocodes, so it is used
+  instead. Nothing was derived from an EUI.
+
+### Where the data centers come from
+
+The IM3 Atlas is OpenStreetMap-derived, and OpenStreetMap's coverage of data
+centers is uneven: 79 buildings in Silicon Valley, 28 in Portland, 21 in
+Seattle — and 10 in Los Angeles, 5 in Sacramento. Where it is thin, building a
+county-parcel ingest to find the missing sites is a data-collection project
+wearing an ingest module's clothes. The honest tool is a cited **seed list**
+(`ingest/manual/<region>_dcs.csv`): each row a real facility whose operator
+publishes its location and floor area, with the URL that says so, emitted as a
+`footprint_estimate` like any other area-derived figure.
+
+Seeds also fix a failure mode the Atlas has for downtown carrier hotels: it
+maps the building's ground footprint, and a 30-storey tower's footprint is a
+thirtieth of its floor space. The Westin Building Exchange is 13,117 sq ft in
+the Atlas and 400,400 sq ft on its owner's page; One Wilshire is 43,850 against
+664,000. A seed carrying the stated floor area, at a carrier-hotel density of
+75 W/sq ft rather than the purpose-built 150, wins the merge.
+
+**San Diego is not included.** Nor is the Inland Empire. Each is a one-entry
+config change if it ever earns one.
+
+### Seattle specifically
+
+- **Enwave Seattle's steam territory is a hand-drawn approximation** —
+  downtown from Denny Way through Pioneer Square, plus First Hill. Enwave
+  publishes no service-area geodata.
+- **Steam-heated buildings are kept as sinks in Seattle only.** Everywhere
+  else a district-steam building already has its heat and is dropped. Enwave's
+  customers are the natural offtakers of a network-level heat swap, which is a
+  commercial question the model does not evaluate and should not pre-empt.
+  They carry `steam_heated: true` and `in_steam: true`.
+- **Water crossings are excluded outright** rather than penalised: Lake Union,
+  the Ship Canal and Elliott Bay separate most of Seattle's sinks from its data
+  centers, and a penalty would still let a pipe be drawn under Lake Washington.
+- **The Westin ↔ Amazon precedent is visible, and its evidence is suppressed by
+  itself.** The Westin Building Exchange ranks first in Seattle. All seven
+  Amazon towers within reach are found, measured and connected — Doppler is
+  96 m away and fully served — but they sit around thirtieth of ninety-three
+  sinks, behind fifty-one downtown hotels, because `office` carries weight 0.3
+  to `hotel`'s 0.7 (offices empty out in summer; hotels heat water all year).
+  Doppler's measured gas use is also *low*, because the campus already runs on
+  recovered Westin heat. The precedent is real, and it is why the building
+  reports little demand.
+
+### California specifically
+
+- Climate zones 3B/3C have little space-heating demand and California
+  electricity is the highest-priced on the map, so results are DHW- and
+  pool-dominated with long paybacks. **That is the expected finding**, not a
+  defect. Sacramento is the control: same measured source, inland winters,
+  SMUD's municipal power at well under coastal prices.
+- AB 802 covers buildings of 50,000 sq ft and up; smaller sinks are modelled.
+- Apartment buildings are collected as sinks in Los Angeles (and New York
+  City) only, where they are dense enough to matter.
+
+### Portland specifically
+
+- All Portland-region demand is modelled: the measured programme covers the
+  city, and the data centers are in Hillsboro.
+- Hillsboro capacity figures in `pdx_mw.csv` are *planned campus* totals from
+  operator announcements, which exceed what is built. They are restricted to
+  campuses whose buildings the Atlas already maps, so the split lands on real
+  structures, and they are all `UNVERIFIED`.
+
+### Everywhere on the West Coast
+
+Cooling type is unknown for every site. Curated capacity reflects approved or
+contracted figures and is `UNVERIFIED` until a person reads each source. Rural
+Washington and Oregon hyperscale sites — Quincy, Prineville, The Dalles,
+Umatilla and Boardman — are not included; screening them needs sink categories
+(food processing, aquaculture) the model does not have. And in Southern
+California the community question about data centers is evaporative cooling
+water, not heat; a water-savings term is the obvious next extension and is
+kept out of the heat score.
 
 ## Known limitations
 

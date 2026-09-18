@@ -1,0 +1,25 @@
+# Seeded Los Angeles data centers. The Atlas maps only ten buildings across
+# Los Angeles and Orange counties, and maps downtown's carrier hotels by their
+# footprint — One Wilshire at 43,850 sq ft is a 30-storey, 664,000 sq ft tower.
+#
+# Columns: name, lat, lon, operator, density, sqft, source_url, source_date, note
+#   density   purpose_built (150 W/sq ft) for a building that is data hall
+#             throughout; carrier_hotel (75 W/sq ft) for a converted office
+#             tower or industrial building with offices, lobbies and unused
+#             floors mixed in.
+#   sqft      Stated floor area from the operator or a public record, not a
+#             footprint.
+#
+# Coordinates are the building's street address; the sink radius here is
+# 1,500 m, so a coordinate good to a few tens of metres is what is needed. A
+# seed within 75 m of an Atlas building with a similar name is merged with it.
+#
+# Not seeded, for want of a stated floor area: Equinix LA3 (1920 E Maple Ave,
+# El Segundo). Not seeded because it is inside One Wilshire: Equinix LA1.
+#
+name,lat,lon,operator,density,sqft,source_url,source_date,note
+One Wilshire,34.0479,-118.2555,CoreSite (LA1) and others,carrier_hotel,664000,https://en.wikipedia.org/wiki/One_Wilshire,2026-09-18,30 floors; 664,000 sq ft; the West Coast's principal carrier hotel. CoreSite LA1 leases 187,533 sq ft of it.
+Digital Realty LAX10,34.0473,-118.2575,Digital Realty,carrier_hotel,489500,https://www.digitalrealty.com/data-centers/americas/los-angeles/lax10,2026-09-18,600 W 7th St; seven-storey converted building; operator states 489,500 sq ft and 27 MW. A ca_mw.csv row can lift this to the stated capacity.
+CoreSite LA2 USPO Terminal Annex,34.0581,-118.2354,CoreSite,carrier_hotel,450000,https://www.coresite.com/data-center/la2-los-angeles-ca,2026-09-18,900 N Alameda St; the 1940 Terminal Annex mail facility, 450,000 sq ft. The Atlas maps it as "USPO Terminal Annex".
+CoreSite LA3,34.0603,-118.2330,CoreSite,purpose_built,160000,https://www.coresite.com/data-center/la3-los-angeles-ca,2026-09-18,200 Bauchet St, adjacent to LA2; purpose-built; designed at 160,000+ sq ft (first phase 51,000 sq ft / 6 MW opened 2020). Coordinate from the street address.
+Equinix LA4,33.9268,-118.3831,Equinix,purpose_built,177000,https://www.equinix.com/newsroom/press-releases/2009/08/equinix-opens-new-95-million-l-a-area-data-center,2026-09-18,445 N Douglas St, El Segundo; opening press release states 177,000 sq ft. Coordinate from the street address.

@@ -24,17 +24,42 @@ export type {
 import type { Counterfactual, MwConfidence, Region } from "@/wasm/heatmatch_wasm";
 
 /** The regions the data covers, in display order. */
-export const REGIONS = ["nyc", "upstate", "nova"] as const;
+export const REGIONS = ["nyc", "upstate", "nova", "seattle", "pdx", "svy", "la", "sac"] as const;
+
+/** Which state each region is in. The region control groups by this, and a
+ *  state view can filter the merged ranking without another schema change. */
+export const STATE_OF_REGION: Record<Region, string> = {
+  nyc: "NY",
+  upstate: "NY",
+  nova: "VA",
+  seattle: "WA",
+  pdx: "OR",
+  svy: "CA",
+  la: "CA",
+  sac: "CA",
+};
+
+export const STATE_LABELS: Record<string, string> = {
+  NY: "New York",
+  VA: "Virginia",
+  WA: "Washington",
+  OR: "Oregon",
+  CA: "California",
+};
 
 /** The ranking and map can show one region or all of them at once. */
 export type RegionView = Region | "all";
-export const REGION_VIEWS = ["all", ...REGIONS] as const;
 
 /** Display names, in one place: three components used to branch on "nyc". */
 export const REGION_LABELS: Record<Region, string> = {
   nyc: "New York City",
   upstate: "Upstate",
   nova: "N. Virginia",
+  seattle: "Seattle",
+  pdx: "Portland",
+  svy: "Silicon Valley",
+  la: "Los Angeles",
+  sac: "Sacramento",
 };
 
 export const REGION_VIEW_LABELS: Record<RegionView, string> = {
@@ -67,20 +92,22 @@ export const COUNTERFACTUAL_LABELS: Record<Counterfactual, string> = {
   heat_pump: "displaces a heat pump",
 };
 
+/** Which region draws a district-heating territory, and what to call it.
+ *  Absent means the region has none to draw. */
+export const ZONE_LABELS: Partial<Record<Region, string>> = {
+  nyc: "Con Ed steam territory",
+  seattle: "Enwave steam territory",
+};
+
 /** How a sink's annual demand was arrived at. Worth showing next to every
  *  number it produced: in Virginia none of them are measured. */
 export const DEMAND_SOURCE_LABELS: Record<string, string> = {
   ll84_fuel: "metered",
+  seattle_bench: "metered",
+  ab802: "metered",
   comstock_modeled: "modelled",
   footprint_estimate: "from footprint",
   category_default: "assumed",
-};
-
-export const REGION_SHORT_LABELS: Record<RegionView, string> = {
-  all: "All",
-  nyc: "NYC",
-  upstate: "Upstate",
-  nova: "N. Va.",
 };
 
 /** Sink categories in the order the UI lists them. */
@@ -122,6 +149,8 @@ export interface SourceEntry {
   url: string;
   license: string;
   note?: string;
+  /** Present on sources that were checked and deliberately not used. */
+  status?: "not_used" | "not_used_unverified";
 }
 
 export interface Manifest {

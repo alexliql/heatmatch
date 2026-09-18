@@ -23,7 +23,7 @@ from ingest.config import (
     FLOORS_GUESS,
     INTENSITY_KWH_PER_M2,
     MIN_AREA_M2,
-    NYC_ONLY_CATS,
+    MULTIFAMILY_REGIONS,
     OVERPASS_FILTERS,
     OVERPASS_MAX_RETRIES,
     OVERPASS_SOURCE,
@@ -164,7 +164,7 @@ def candidates(
     gates = min_area_for(region)
 
     for cat in OVERPASS_FILTERS:
-        if region != "nyc" and cat in NYC_ONLY_CATS:
+        if cat == "residential_multifamily" and region not in MULTIFAMILY_REGIONS:
             continue
         body = cached_post(
             OVERPASS_URL,
@@ -189,6 +189,7 @@ def candidates(
 
             tags = el.get("tags") or {}
             demand_kwh, demand_source = _demand(cat, area_m2, tags)
+            floors = _floors(tags, cat) if area_m2 else None
             rows.append(
                 {
                     "name": tags.get("name") or f"Unnamed {cat.replace('_', ' ')}",
@@ -199,9 +200,13 @@ def candidates(
                     "demand_kwh": demand_kwh,
                     "demand_source": demand_source,
                     # Carried so a region with a demand model can use it; the
-                    # footprint estimate above already has.
+                    # footprint estimate above already has. `area_m2` is the
+                    # ground footprint OpenStreetMap draws; a per-floor
+                    # intensity wants the floor area, which is floors times
+                    # that — for a downtown tower, thirty times that.
                     "area_m2": area_m2,
                     "area_source": "osm" if area_m2 else "none",
+                    "floor_area_m2": area_m2 * floors if area_m2 else None,
                     "steam_heated": False,  # needs LL84 (T8)
                     "sources": [OVERPASS_SOURCE["id"]],
                 }
