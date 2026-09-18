@@ -9,7 +9,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from ingest.config import MW_CONFIDENCE_BY_SOURCE, RegionName, SinkCat
+from ingest.config import MW_CONFIDENCE_BY_SOURCE, Counterfactual, RegionName, SinkCat
 
 # `pnnl` from §3.2 is deliberately absent: the Atlas publishes no capacity
 # field, so a MW value can never be sourced directly from it. Area-derived
@@ -20,8 +20,11 @@ MwSource = Literal[
     "pluto_estimate",
     "parcel_estimate",
     "manual",
-    # Virginia publishes real capacities for some sites: an operator statement
-    # is "reported", a county approval or utility filing is "filed".
+    # A site seeded by hand from an operator's page, with its stated floor
+    # area: an estimate, from an area someone published.
+    "seed_sqft",
+    # Some sites publish real capacities: an operator statement is "reported",
+    # a county approval or utility filing is "filed".
     "reported",
     "filed",
 ]
@@ -30,6 +33,11 @@ MwSource = Literal[
 MwConfidence = Literal["reported", "filed", "parcel_estimate", "footprint_estimate"]
 DemandSource = Literal[
     "ll84_fuel",
+    # The other measured sources: California's statewide AB 802 disclosure
+    # and Seattle's city benchmarking. Portland's and Los Angeles's own
+    # programmes were checked and not used — see `cli.NOT_USED` for why.
+    "ab802",
+    "seattle_bench",
     # Annual intensity from NREL ComStock times floor area. Modelled, not
     # measured — the only option in states with no benchmarking disclosure.
     "comstock_modeled",
@@ -94,11 +102,21 @@ class DataCenter(_Located):
 
 class Sink(_Located):
     cat: SinkCat
+    # Annual *delivered* heat, kWh — see config.BOILER_EFF for why not fuel.
     demand_kwh: float = Field(gt=0)
     demand_source: DemandSource
-    # Floor or footprint area behind a modelled demand, when one is known.
+    # Set when a measurement was overruled; the only value so far is
+    # "measured_fuel_near_zero".
+    demand_note: str | None = None
+    # What the building heats with today. Gas unless something says otherwise,
+    # so every New York sink prices exactly as it did before the field existed.
+    counterfactual: Counterfactual = "gas"
+    # Ground footprint behind a modelled demand, when one is known.
     area_m2: float | None = Field(default=None, gt=0)
     area_source: AreaSource = "none"
+    # Footprint times storeys (from `building:levels`, else a category guess).
+    # This, not the footprint, is what a per-square-metre intensity applies to.
+    floor_area_m2: float | None = Field(default=None, gt=0)
     # True when LL84 shows district steam as the primary heating fuel; such
     # sinks are dropped before output, since their heat is already supplied.
     steam_heated: bool = False

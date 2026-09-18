@@ -105,6 +105,5 @@ def polygons(
 
 def to_features(polys: list[Polygon]) -> list[dict]:
     return [
-        {"type": "Feature", "geometry": mapping(p), "properties": {"kind": "water"}}
-        for p in polys
+        {"type": "Feature", "geometry": mapping(p), "properties": {"kind": "water"}} for p in polys
     ]

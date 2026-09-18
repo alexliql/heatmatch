@@ -15,11 +15,14 @@ import { useStore } from "@/lib/store";
 import {
   CONFIDENCE_LABELS,
   CONFIDENCE_MARKS,
-  REGION_SHORT_LABELS,
-  REGION_VIEWS,
-  REGION_VIEW_LABELS,
+  REGIONS,
   REGION_LABELS,
+  REGION_VIEW_LABELS,
+  STATE_LABELS,
+  STATE_OF_REGION,
   type Match,
+  type Region,
+  type RegionView,
 } from "@/lib/types";
 import { useCoarsePointer, useLayoutMode } from "@/lib/useMedia";
 
@@ -39,39 +42,58 @@ const SORTS = [
  *  in the detail. */
 /** Which region the map and ranking show. "All" keeps the cross-region view
  *  the app opens with; picking one narrows both, and points the assumption
- *  sliders at it. */
-function RegionTabs() {
+ *  sliders at it.
+ *
+ *  A grouped select rather than a row of tabs: eight regions across five
+ *  states no longer fit on one line, and the state is the grouping a reader
+ *  actually thinks in. Built from STATE_OF_REGION so a ninth region is a
+ *  one-line config change here as it is everywhere else. */
+function RegionSelect() {
   const viewRegion = useStore((s) => s.viewRegion);
   const setViewRegion = useStore((s) => s.setViewRegion);
   const results = useStore((s) => s.results);
 
-  // A region with nothing in it is shown but not offered: its absence is
-  // information, and a dead tab is better than a tab that silently empties.
+  // A region with nothing in it is listed but not offered: its absence is
+  // information, and a disabled option is better than one that empties.
   const counts = useMemo(() => {
     const by = new Map<string, number>();
     for (const m of results) by.set(m.region, (by.get(m.region) ?? 0) + 1);
     return by;
   }, [results]);
 
+  const byState = useMemo(() => {
+    const groups = new Map<string, Region[]>();
+    for (const r of REGIONS) {
+      const st = STATE_OF_REGION[r];
+      groups.set(st, [...(groups.get(st) ?? []), r]);
+    }
+    return groups;
+  }, []);
+
   return (
-    <div className="seg seg-full region-tabs" role="tablist" aria-label="Region to show">
-      {REGION_VIEWS.map((r) => {
-        const n = r === "all" ? results.length : (counts.get(r) ?? 0);
-        return (
-          <button
-            key={r}
-            role="tab"
-            aria-selected={viewRegion === r}
-            data-active={viewRegion === r}
-            disabled={n === 0}
-            title={`${REGION_VIEW_LABELS[r]} — ${n} site${n === 1 ? "" : "s"}`}
-            onClick={() => setViewRegion(r)}
-          >
-            {REGION_SHORT_LABELS[r]}
-          </button>
-        );
-      })}
-    </div>
+    <label className="region-select">
+      <span className="label">Region</span>
+      <select
+        className="input"
+        aria-label="Region to show"
+        value={viewRegion}
+        onChange={(e) => setViewRegion(e.target.value as RegionView)}
+      >
+        <option value="all">All — {results.length} sites</option>
+        {[...byState].map(([st, regions]) => (
+          <optgroup key={st} label={STATE_LABELS[st] ?? st}>
+            {regions.map((r) => {
+              const n = counts.get(r) ?? 0;
+              return (
+                <option key={r} value={r} disabled={n === 0}>
+                  {REGION_LABELS[r]} — {n} site{n === 1 ? "" : "s"}
+                </option>
+              );
+            })}
+          </optgroup>
+        ))}
+      </select>
+    </label>
   );
 }
 
@@ -201,7 +223,7 @@ export function Ranking() {
   if (!inView.length) {
     return (
       <>
-        <RegionTabs />
+        <RegionSelect />
         <div className="empty">
           <b>Nothing to rank here</b>
           No data centers in {REGION_VIEW_LABELS[viewRegion]}.
@@ -218,7 +240,7 @@ export function Ranking() {
 
   return (
     <>
-      <RegionTabs />
+      <RegionSelect />
       <div className="rank-tools">
         {!(compact && showSearch) && <span className="label">Ranked data centers</span>}
         <span className="rank-tools-right">

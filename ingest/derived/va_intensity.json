@@ -1,286 +1,325 @@
 {
-  "by_type": {
-    "FullServiceRestaurant": {
-      "fuel_heated_share": 0.7746126936531734,
-      "kwh_per_m2": 235.9108551097761,
-      "kwh_per_m2_incl_electric": 371.45060884704225,
-      "monthly": [
-        0.163189,
-        0.090833,
-        0.110193,
-        0.071999,
-        0.056598,
-        0.054115,
-        0.055745,
-        0.057336,
-        0.054107,
-        0.066374,
-        0.100602,
-        0.118909
-      ],
-      "samples": 2001
+  "nova": {
+    "basis": {
+      "combustion": "['natural_gas.heating', 'natural_gas.water_systems', 'fuel_oil.heating', 'fuel_oil.water_systems', 'propane.heating', 'propane.water_systems'] x BOILER_EFF=0.85",
+      "counterfactual": "weighted majority of in.hvac_heat_type via {'Furnace': 'gas', 'Boiler': 'gas', 'District': 'gas', 'Electric Resistance': 'electric_resistance', 'ASHP': 'heat_pump', 'WSHP': 'heat_pump', 'GSHP': 'heat_pump'}",
+      "district": "out.district_heating.{heating,water_systems} x 1.0",
+      "electric_heating": "out.electricity.heating.energy_consumption..kwh x 3.0 if in.hvac_heat_type in ['ASHP', 'GSHP', 'WSHP'] else x 1.0",
+      "electric_water": "out.electricity.water_systems.energy_consumption..kwh x 1.0 (baseline stock has no heat-pump water heaters)",
+      "monthly": "share by month of every heating end-use across all fuels, state-level aggregate; electric heating at unit weight (no per-building COP available)",
+      "quantity": "delivered heat, kWh per m2 of floor area, weighted by ComStock `weight`"
     },
-    "Grocery": {
-      "fuel_heated_share": 0.7467248908296943,
-      "kwh_per_m2": 90.60205943804968,
-      "kwh_per_m2_incl_electric": 114.60969407072588,
-      "monthly": [
-        0.228104,
-        0.107112,
-        0.141549,
-        0.066851,
-        0.032778,
-        0.028541,
-        0.028604,
-        0.028774,
-        0.029709,
-        0.05426,
-        0.113023,
-        0.140695
-      ],
-      "samples": 229
+    "by_type": {
+      "FullServiceRestaurant": {
+        "counterfactual": "gas",
+        "fuel_heated_share": 0.7746126936531734,
+        "kwh_per_m2": 354.21953185821866,
+        "kwh_per_m2_fuel_only": 200.52422684330963,
+        "majority_heat_type": "Furnace",
+        "monthly": [
+          0.165876,
+          0.092822,
+          0.111785,
+          0.07255,
+          0.055784,
+          0.053107,
+          0.054619,
+          0.055448,
+          0.053089,
+          0.065691,
+          0.10009,
+          0.119139
+        ],
+        "samples": 2001
+      },
+      "Grocery": {
+        "counterfactual": "gas",
+        "fuel_heated_share": 0.7467248908296943,
+        "kwh_per_m2": 101.0193851550184,
+        "kwh_per_m2_fuel_only": 77.01175052234221,
+        "majority_heat_type": "Furnace",
+        "monthly": [
+          0.235275,
+          0.107526,
+          0.139655,
+          0.064475,
+          0.030298,
+          0.026209,
+          0.026246,
+          0.026427,
+          0.027417,
+          0.052375,
+          0.117263,
+          0.146834
+        ],
+        "samples": 229
+      },
+      "LargeHotel": {
+        "counterfactual": "gas",
+        "fuel_heated_share": 0.9795501022494888,
+        "kwh_per_m2": 99.6363993616507,
+        "kwh_per_m2_fuel_only": 83.30296308043935,
+        "majority_heat_type": "Boiler",
+        "monthly": [
+          0.168905,
+          0.103174,
+          0.121981,
+          0.077168,
+          0.051641,
+          0.04614,
+          0.04561,
+          0.045062,
+          0.045432,
+          0.063819,
+          0.105986,
+          0.125082
+        ],
+        "samples": 978
+      },
+      "LargeOffice": {
+        "counterfactual": "electric_resistance",
+        "fuel_heated_share": 0.3564026646928201,
+        "kwh_per_m2": 35.087691056196086,
+        "kwh_per_m2_fuel_only": 8.618859175068009,
+        "majority_heat_type": "Electric Resistance",
+        "monthly": [
+          0.267432,
+          0.13542,
+          0.149821,
+          0.057001,
+          0.017596,
+          0.014466,
+          0.013204,
+          0.013245,
+          0.016117,
+          0.037685,
+          0.122723,
+          0.15529
+        ],
+        "samples": 2702
+      },
+      "MediumOffice": {
+        "counterfactual": "gas",
+        "fuel_heated_share": 0.6736298292902066,
+        "kwh_per_m2": 35.945092047331066,
+        "kwh_per_m2_fuel_only": 19.350809324070358,
+        "majority_heat_type": "Boiler",
+        "monthly": [
+          0.285353,
+          0.124864,
+          0.149087,
+          0.051573,
+          0.01714,
+          0.013839,
+          0.012944,
+          0.012912,
+          0.015691,
+          0.037397,
+          0.118496,
+          0.160704
+        ],
+        "samples": 4452
+      },
+      "Outpatient": {
+        "counterfactual": "electric_resistance",
+        "fuel_heated_share": 0.496,
+        "kwh_per_m2": 55.547345272370606,
+        "kwh_per_m2_fuel_only": 24.18694773617195,
+        "majority_heat_type": "Electric Resistance",
+        "monthly": [
+          0.286063,
+          0.11897,
+          0.145496,
+          0.055109,
+          0.01983,
+          0.016857,
+          0.016301,
+          0.016748,
+          0.016668,
+          0.036552,
+          0.114847,
+          0.156559
+        ],
+        "samples": 125
+      },
+      "PrimarySchool": {
+        "counterfactual": "gas",
+        "fuel_heated_share": 0.8209764918625678,
+        "kwh_per_m2": 97.43130112990217,
+        "kwh_per_m2_fuel_only": 67.04840218762303,
+        "majority_heat_type": "Boiler",
+        "monthly": [
+          0.263848,
+          0.12341,
+          0.153258,
+          0.06219,
+          0.017624,
+          0.013099,
+          0.011663,
+          0.012054,
+          0.012037,
+          0.040551,
+          0.125537,
+          0.164729
+        ],
+        "samples": 1106
+      },
+      "QuickServiceRestaurant": {
+        "counterfactual": "gas",
+        "fuel_heated_share": 0.753114382785957,
+        "kwh_per_m2": 187.2312007204126,
+        "kwh_per_m2_fuel_only": 101.21738406528613,
+        "majority_heat_type": "Furnace",
+        "monthly": [
+          0.2519,
+          0.112743,
+          0.147309,
+          0.066333,
+          0.028038,
+          0.022484,
+          0.021323,
+          0.021071,
+          0.022001,
+          0.046751,
+          0.112233,
+          0.147814
+        ],
+        "samples": 883
+      },
+      "RetailStandalone": {
+        "counterfactual": "gas",
+        "fuel_heated_share": 0.6198509219301687,
+        "kwh_per_m2": 42.799024734010274,
+        "kwh_per_m2_fuel_only": 31.6247592153907,
+        "majority_heat_type": "Furnace",
+        "monthly": [
+          0.354072,
+          0.118816,
+          0.171628,
+          0.038622,
+          0.002334,
+          0.000592,
+          4.1e-05,
+          0.000918,
+          0.000228,
+          0.017627,
+          0.117776,
+          0.177346
+        ],
+        "samples": 5098
+      },
+      "RetailStripmall": {
+        "counterfactual": "gas",
+        "fuel_heated_share": 0.7870774890779489,
+        "kwh_per_m2": 106.10228433815956,
+        "kwh_per_m2_fuel_only": 61.5102125745781,
+        "majority_heat_type": "Furnace",
+        "monthly": [
+          0.209135,
+          0.100794,
+          0.122857,
+          0.063037,
+          0.045906,
+          0.042988,
+          0.043839,
+          0.043722,
+          0.042945,
+          0.054101,
+          0.101128,
+          0.129548
+        ],
+        "samples": 4349
+      },
+      "SecondarySchool": {
+        "counterfactual": "gas",
+        "fuel_heated_share": 0.8716666666666667,
+        "kwh_per_m2": 103.17824734413043,
+        "kwh_per_m2_fuel_only": 76.97688752924277,
+        "majority_heat_type": "Boiler",
+        "monthly": [
+          0.291002,
+          0.122158,
+          0.157249,
+          0.05723,
+          0.011398,
+          0.007881,
+          0.006938,
+          0.006989,
+          0.008248,
+          0.036339,
+          0.125705,
+          0.168863
+        ],
+        "samples": 600
+      },
+      "SmallHotel": {
+        "counterfactual": "electric_resistance",
+        "fuel_heated_share": 0.5875706214689266,
+        "kwh_per_m2": 52.86472095646796,
+        "kwh_per_m2_fuel_only": 28.534767312670247,
+        "majority_heat_type": "Electric Resistance",
+        "monthly": [
+          0.183932,
+          0.09318,
+          0.109103,
+          0.069396,
+          0.058915,
+          0.053353,
+          0.052727,
+          0.052396,
+          0.052451,
+          0.062397,
+          0.093732,
+          0.118418
+        ],
+        "samples": 177
+      },
+      "SmallOffice": {
+        "counterfactual": "gas",
+        "fuel_heated_share": 0.6046220242238619,
+        "kwh_per_m2": 44.04532496285437,
+        "kwh_per_m2_fuel_only": 22.82670810969698,
+        "majority_heat_type": "Furnace",
+        "monthly": [
+          0.329941,
+          0.119172,
+          0.166623,
+          0.046081,
+          0.01178,
+          0.010302,
+          0.010466,
+          0.010741,
+          0.009971,
+          0.024564,
+          0.108196,
+          0.152163
+        ],
+        "samples": 7183
+      },
+      "Warehouse": {
+        "counterfactual": "gas",
+        "fuel_heated_share": 0.7088078967350038,
+        "kwh_per_m2": 20.001706165633145,
+        "kwh_per_m2_fuel_only": 16.62372696284926,
+        "majority_heat_type": "Furnace",
+        "monthly": [
+          0.419823,
+          0.120441,
+          0.152315,
+          0.024712,
+          0.000412,
+          0.000104,
+          5.8e-05,
+          0.000157,
+          0.000153,
+          0.007601,
+          0.101213,
+          0.173011
+        ],
+        "samples": 2634
+      }
     },
-    "LargeHotel": {
-      "fuel_heated_share": 0.9795501022494888,
-      "kwh_per_m2": 98.00348597698749,
-      "kwh_per_m2_incl_electric": 111.24992497636876,
-      "monthly": [
-        0.156034,
-        0.101394,
-        0.119008,
-        0.079711,
-        0.055698,
-        0.049575,
-        0.048861,
-        0.048239,
-        0.048721,
-        0.066857,
-        0.104278,
-        0.121624
-      ],
-      "samples": 978
-    },
-    "LargeOffice": {
-      "fuel_heated_share": 0.3564026646928201,
-      "kwh_per_m2": 10.139834323609424,
-      "kwh_per_m2_incl_electric": 24.498249700478656,
-      "monthly": [
-        0.246622,
-        0.134175,
-        0.146945,
-        0.062062,
-        0.020921,
-        0.017183,
-        0.015984,
-        0.015727,
-        0.01974,
-        0.044301,
-        0.122991,
-        0.153349
-      ],
-      "samples": 2702
-    },
-    "MediumOffice": {
-      "fuel_heated_share": 0.6736298292902066,
-      "kwh_per_m2": 22.76565802831807,
-      "kwh_per_m2_incl_electric": 38.43741644685666,
-      "monthly": [
-        0.277821,
-        0.128702,
-        0.147367,
-        0.054377,
-        0.017176,
-        0.013462,
-        0.011919,
-        0.011758,
-        0.01601,
-        0.03894,
-        0.119843,
-        0.162625
-      ],
-      "samples": 4452
-    },
-    "Outpatient": {
-      "fuel_heated_share": 0.496,
-      "kwh_per_m2": 28.45523263079053,
-      "kwh_per_m2_incl_electric": 59.316106146954105,
-      "monthly": [
-        0.276831,
-        0.126701,
-        0.151131,
-        0.060818,
-        0.016907,
-        0.013543,
-        0.012361,
-        0.013129,
-        0.014437,
-        0.037819,
-        0.118227,
-        0.158096
-      ],
-      "samples": 125
-    },
-    "PrimarySchool": {
-      "fuel_heated_share": 0.8209764918625678,
-      "kwh_per_m2": 78.88047316190944,
-      "kwh_per_m2_incl_electric": 102.93949992933273,
-      "monthly": [
-        0.265433,
-        0.125808,
-        0.157744,
-        0.062104,
-        0.014188,
-        0.010619,
-        0.010289,
-        0.010605,
-        0.010114,
-        0.040219,
-        0.126364,
-        0.166513
-      ],
-      "samples": 1106
-    },
-    "QuickServiceRestaurant": {
-      "fuel_heated_share": 0.753114382785957,
-      "kwh_per_m2": 119.07927537092483,
-      "kwh_per_m2_incl_electric": 195.38352201806595,
-      "monthly": [
-        0.240886,
-        0.109388,
-        0.143533,
-        0.06916,
-        0.032165,
-        0.026087,
-        0.02482,
-        0.024514,
-        0.025476,
-        0.049576,
-        0.110306,
-        0.144089
-      ],
-      "samples": 883
-    },
-    "RetailStandalone": {
-      "fuel_heated_share": 0.6198509219301687,
-      "kwh_per_m2": 37.205599076930234,
-      "kwh_per_m2_incl_electric": 46.37496834493527,
-      "monthly": [
-        0.34077,
-        0.121883,
-        0.173472,
-        0.043215,
-        0.003333,
-        0.000867,
-        6e-05,
-        7.6e-05,
-        0.000333,
-        0.020546,
-        0.119858,
-        0.175587
-      ],
-      "samples": 5098
-    },
-    "RetailStripmall": {
-      "fuel_heated_share": 0.7870774890779489,
-      "kwh_per_m2": 72.36495597009188,
-      "kwh_per_m2_incl_electric": 115.64093800820898,
-      "monthly": [
-        0.216475,
-        0.099339,
-        0.121633,
-        0.060997,
-        0.046678,
-        0.043582,
-        0.044397,
-        0.044208,
-        0.043391,
-        0.053242,
-        0.098829,
-        0.127229
-      ],
-      "samples": 4349
-    },
-    "SecondarySchool": {
-      "fuel_heated_share": 0.8716666666666667,
-      "kwh_per_m2": 90.56104415205034,
-      "kwh_per_m2_incl_electric": 102.91932596082373,
-      "monthly": [
-        0.281951,
-        0.123601,
-        0.160181,
-        0.058641,
-        0.010085,
-        0.00689,
-        0.006245,
-        0.006269,
-        0.007424,
-        0.036962,
-        0.129422,
-        0.172329
-      ],
-      "samples": 600
-    },
-    "SmallHotel": {
-      "fuel_heated_share": 0.5875706214689266,
-      "kwh_per_m2": 33.570314485494414,
-      "kwh_per_m2_incl_electric": 55.15895571805178,
-      "monthly": [
-        0.155609,
-        0.091451,
-        0.109419,
-        0.074894,
-        0.065894,
-        0.059622,
-        0.058992,
-        0.05865,
-        0.058675,
-        0.068631,
-        0.088767,
-        0.109396
-      ],
-      "samples": 177
-    },
-    "SmallOffice": {
-      "fuel_heated_share": 0.6046220242238619,
-      "kwh_per_m2": 26.85495071729056,
-      "kwh_per_m2_incl_electric": 42.84431580052113,
-      "monthly": [
-        0.334692,
-        0.117893,
-        0.173874,
-        0.041333,
-        0.009755,
-        0.008499,
-        0.00864,
-        0.008846,
-        0.008239,
-        0.02208,
-        0.10676,
-        0.159389
-      ],
-      "samples": 7183
-    },
-    "Warehouse": {
-      "fuel_heated_share": 0.7088078967350038,
-      "kwh_per_m2": 19.557325838646193,
-      "kwh_per_m2_incl_electric": 22.480649604460393,
-      "monthly": [
-        0.415898,
-        0.12042,
-        0.157812,
-        0.026382,
-        0.0004,
-        9.8e-05,
-        4.7e-05,
-        7.6e-05,
-        0.000122,
-        0.007919,
-        0.099625,
-        0.171201
-      ],
-      "samples": 2634
-    }
-  },
-  "climate_zone": "4A",
-  "release": "2025/comstock_amy2018_release_3"
+    "climate_zone": "4A",
+    "release": "2025/comstock_amy2018_release_3"
+  }
 }

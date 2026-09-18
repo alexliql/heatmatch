@@ -1021,11 +1021,14 @@ dialog.about::backdrop { background: rgba(0, 0, 0, 0.45); -webkit-backdrop-filte
   cursor: help;
 }
 
-/* Region tabs sit above the ranking tools and share the segmented style. */
-.region-tabs {
+/* Region select sits above the ranking tools. */
+.region-select {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
   margin: 0 var(--s-4) var(--s-2);
 }
-.region-tabs button:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
+.region-select select {
+  flex: 1;
+  min-width: 0;
 }

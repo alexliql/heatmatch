@@ -77,6 +77,25 @@ export function decodeScenario(
   }
 }
 
+/** Region view, as `?region=nova`. Separate from the scenario param so a
+ *  link can pin a region without carrying every slider, and vice versa. */
+export const REGION_PARAM = "region";
+
+export function readRegionParam(): string | null {
+  try {
+    return new URLSearchParams(window.location.search).get(REGION_PARAM);
+  } catch {
+    return null;
+  }
+}
+
+export function writeRegionParam(value: string | null) {
+  const url = new URL(window.location.href);
+  if (value && value !== "all") url.searchParams.set(REGION_PARAM, value);
+  else url.searchParams.delete(REGION_PARAM);
+  window.history.replaceState(null, "", url.toString());
+}
+
 export function readScenarioParam(): string | null {
   try {
     return new URLSearchParams(window.location.search).get(PARAM);

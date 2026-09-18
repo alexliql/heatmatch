@@ -13,7 +13,14 @@
 import { create } from "zustand";
 
 import { loadEngine, type Engine, type LoadProgress } from "./engine";
-import { decodeScenario, encodeScenario, readScenarioParam, writeScenarioParam } from "./scenario";
+import {
+  decodeScenario,
+  encodeScenario,
+  readRegionParam,
+  readScenarioParam,
+  writeRegionParam,
+  writeScenarioParam,
+} from "./scenario";
 import {
   REGIONS,
   type Contribution,
@@ -157,10 +164,17 @@ export const useStore = create<State>((set, get) => ({
       // A shared link carries its scenario; otherwise the defaults.
       const param = readScenarioParam();
       const fromUrl = param ? decodeScenario(engine, param) : null;
+      // A link may also pin a region. Anything not a known region is "all".
+      const region = readRegionParam();
+      const viewRegion: RegionView = (REGIONS as readonly string[]).includes(region ?? "")
+        ? (region as Region)
+        : "all";
       set({
         engine,
         weights: fromUrl?.weights ?? defaults((r) => engine.defaultWeights(r)),
         econ: fromUrl?.econ ?? defaults((r) => engine.defaultEcon(r)),
+        viewRegion,
+        tuningRegion: viewRegion === "all" ? get().tuningRegion : viewRegion,
         error: null,
       });
       get().recompute();
@@ -179,8 +193,10 @@ export const useStore = create<State>((set, get) => ({
   // Choosing a single region also points the sliders at it: editing New York's
   // assumptions while looking only at Virginia is never what was meant. "All"
   // leaves the tuning target alone, since there is no one region to pick.
-  setViewRegion: (viewRegion) =>
-    set(viewRegion === "all" ? { viewRegion } : { viewRegion, tuningRegion: viewRegion }),
+  setViewRegion: (viewRegion) => {
+    set(viewRegion === "all" ? { viewRegion } : { viewRegion, tuningRegion: viewRegion });
+    writeRegionParam(viewRegion);
+  },
 
   setWeights: (patch) => {
     const { weights, tuningRegion } = get();

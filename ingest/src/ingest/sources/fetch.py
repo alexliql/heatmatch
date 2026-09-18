@@ -54,9 +54,7 @@ def cached_post(
     last: Exception | None = None
     for attempt in range(max_retries):
         try:
-            r = requests.post(
-                url, data=data, headers={"User-Agent": USER_AGENT}, timeout=300
-            )
+            r = requests.post(url, data=data, headers={"User-Agent": USER_AGENT}, timeout=300)
             # 429/504 are Overpass's "busy, come back later" signals.
             if r.status_code in (429, 504):
                 raise requests.HTTPError(f"{r.status_code} rate limited")

@@ -37,10 +37,10 @@ def _candidate_where() -> str:
     an operator, or the address is a known carrier hotel — those sit in ordinary
     office classes and the class filter alone would miss them.
     """
-    classes = " OR ".join(
-        f"starts_with(bldgclass, {_quote(p)})" for p in PLUTO_BLDG_CLASS_PREFIXES
+    classes = " OR ".join(f"starts_with(bldgclass, {_quote(p)})" for p in PLUTO_BLDG_CLASS_PREFIXES)
+    owners = " OR ".join(
+        f"upper(ownername) like {_quote('%' + n + '%')}" for n in DC_OPERATOR_NAMES
     )
-    owners = " OR ".join(f"upper(ownername) like {_quote('%' + n + '%')}" for n in DC_OPERATOR_NAMES)
     addresses = " OR ".join(f"upper(address) = {_quote(a)}" for a in CARRIER_HOTEL_ADDRESSES)
     return f"(({classes}) AND ({owners})) OR ({addresses})"
 

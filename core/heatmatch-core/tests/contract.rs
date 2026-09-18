@@ -89,17 +89,35 @@ fn committed_sinks_deserialize() {
     }
 }
 
-/// Ingest drops steam-heated sinks before writing, so none should reach core.
+/// Ingest drops steam-heated sinks before writing — except in Seattle, which
+/// keeps Enwave's customers as candidate offtakers of a network-level swap.
+/// Anywhere else, one reaching core means the drop rule broke.
 #[test]
-fn no_steam_heated_sinks_were_shipped() {
+fn steam_heated_sinks_ship_only_where_the_region_keeps_them() {
+    let mut kept_in_seattle = 0;
     for f in features(find_asset("sinks.")) {
-        assert_ne!(
-            f["properties"]["steam_heated"],
-            Value::Bool(true),
+        if f["properties"]["steam_heated"] != Value::Bool(true) {
+            continue;
+        }
+        assert_eq!(
+            f["properties"]["region"],
+            Value::String("seattle".into()),
             "steam-heated sink {} should have been filtered by ingest",
             f["properties"]["id"]
         );
+        // And it must say so on the map as well as in the fuel data.
+        assert_eq!(
+            f["properties"]["in_steam"],
+            Value::Bool(true),
+            "{}",
+            f["properties"]["id"]
+        );
+        kept_in_seattle += 1;
     }
+    assert!(
+        kept_in_seattle > 0,
+        "Seattle ships no steam-heated sinks; the keep rule broke"
+    );
 }
 
 /// End to end on the real data: the engine must build and rank it.

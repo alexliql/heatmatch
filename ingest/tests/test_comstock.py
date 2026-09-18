@@ -14,13 +14,17 @@ import pytest
 from ingest.config import COMSTOCK_PROFILE_TYPE_BY_CAT, COMSTOCK_RELEASE
 from ingest.sources import comstock
 
-DERIVED = Path(__file__).resolve().parents[1] / "derived" / "va_intensity.json"
+DERIVED = Path(__file__).resolve().parents[1] / "derived"
 
 # A minimal stand-in for the real table.
 TABLE = {
-    "MediumOffice": {"kwh_per_m2": 20.0, "monthly": [1 / 12] * 12},
-    "LargeOffice": {"kwh_per_m2": 10.0, "monthly": [1 / 12] * 12},
-    "PrimarySchool": {"kwh_per_m2": 80.0, "monthly": [1 / 12] * 12},
+    "MediumOffice": {"kwh_per_m2": 20.0, "monthly": [1 / 12] * 12, "counterfactual": "gas"},
+    "LargeOffice": {
+        "kwh_per_m2": 40.0,
+        "monthly": [1 / 12] * 12,
+        "counterfactual": "electric_resistance",
+    },
+    "PrimarySchool": {"kwh_per_m2": 80.0, "monthly": [1 / 12] * 12, "counterfactual": "gas"},
 }
 
 
@@ -55,8 +59,23 @@ def test_a_category_comstock_does_not_model_falls_through() -> None:
     assert comstock.demand_kwh("hospital", 5_000.0, TABLE) is None
 
 
-def test_demand_is_intensity_times_area_and_labelled_modelled() -> None:
+def test_demand_is_intensity_times_floor_area_and_labelled_modelled() -> None:
     assert comstock.demand_kwh("school", 6_000.0, TABLE) == (480_000.0, "comstock_modeled")
+
+
+def test_the_intensity_applies_to_floor_area_not_footprint() -> None:
+    """A per-square-metre intensity times a ground footprint put a 28-storey
+    Seattle office tower at 96 MWh a year. The tower's footprint is 3,081 m2;
+    its floor area is that times 28."""
+    footprint, storeys = 3_081.0, 28.0
+    wrong = comstock.demand_kwh("office", footprint, TABLE)
+    right = comstock.demand_kwh("office", footprint * storeys, TABLE)
+    assert right is not None and wrong is not None
+    # And the size split is by floor area too: this footprint is a medium
+    # office at one storey and a large one at twenty-eight.
+    assert comstock.comstock_type("office", footprint) == "MediumOffice"
+    assert comstock.comstock_type("office", footprint * storeys) == "LargeOffice"
+    assert right[0] > wrong[0] * 10
 
 
 def test_profiles_cover_only_modelled_categories() -> None:
@@ -72,9 +91,22 @@ def test_profiles_cover_only_modelled_categories() -> None:
 
 @pytest.fixture(scope="module")
 def shipped() -> dict:
-    if not DERIVED.exists():
+    """The Virginia table, from the state file that now holds it."""
+    path = DERIVED / "va_intensity.json"
+    if not path.exists():
         pytest.skip("derived/va_intensity.json not built yet")
-    return json.loads(DERIVED.read_text())
+    return json.loads(path.read_text())["nova"]
+
+
+@pytest.fixture(scope="module")
+def every_shipped() -> dict[str, dict]:
+    """Every region's table across every state file, keyed by region."""
+    out: dict[str, dict] = {}
+    for path in sorted(DERIVED.glob("*_intensity.json")):
+        out.update(json.loads(path.read_text()))
+    if not out:
+        pytest.skip("no derived tables built yet")
+    return out
 
 
 def test_shipped_table_matches_the_pinned_release(shipped: dict) -> None:
@@ -83,13 +115,14 @@ def test_shipped_table_matches_the_pinned_release(shipped: dict) -> None:
     assert shipped["climate_zone"] == "4A"
 
 
-def test_every_shipped_profile_is_a_distribution(shipped: dict) -> None:
+def test_every_shipped_profile_is_a_distribution(every_shipped: dict[str, dict]) -> None:
     """The engine rejects a profile that is not, so catch it here instead."""
-    for name, entry in shipped["by_type"].items():
-        monthly = entry["monthly"]
-        assert len(monthly) == 12, name
-        assert all(v >= 0 for v in monthly), name
-        assert abs(sum(monthly) - 1.0) <= 1e-6, f"{name} sums to {sum(monthly)}"
+    for region, table in every_shipped.items():
+        for name, entry in table["by_type"].items():
+            monthly = entry["monthly"]
+            assert len(monthly) == 12, (region, name)
+            assert all(v >= 0 for v in monthly), (region, name)
+            assert abs(sum(monthly) - 1.0) <= 1e-6, f"{region} {name} sums to {sum(monthly)}"
 
 
 def test_every_category_needing_a_profile_has_one(shipped: dict) -> None:
@@ -97,19 +130,45 @@ def test_every_category_needing_a_profile_has_one(shipped: dict) -> None:
         assert building_type in shipped["by_type"], f"{cat} -> {building_type} missing"
 
 
-def test_shipped_intensities_are_physically_plausible(shipped: dict) -> None:
+def test_shipped_intensities_are_physically_plausible(every_shipped: dict[str, dict]) -> None:
     """Loose bounds: this catches a unit error, not a modelling disagreement.
 
-    The ceiling is generous because these are heating fuel only — a restaurant
-    burns a lot of gas per square metre — and the floor is zero-exclusive
-    because a type where nothing burns fuel would mean the columns moved.
+    Delivered heat, so the ceiling is generous — a restaurant delivers a lot of
+    heat per square metre — and the floor is zero-exclusive because a type
+    delivering nothing would mean the columns moved.
     """
-    for name, entry in shipped["by_type"].items():
-        kwh = entry["kwh_per_m2"]
-        assert 1.0 < kwh < 500.0, f"{name} at {kwh} kWh/m2 looks like a unit error"
-        assert entry["samples"] >= 30, name
-        # Excluding electric heat can only lower the figure, never raise it.
-        assert entry["kwh_per_m2_incl_electric"] >= kwh, name
+    for region, table in every_shipped.items():
+        assert table["release"] == COMSTOCK_RELEASE, region
+        for name, entry in table["by_type"].items():
+            kwh = entry["kwh_per_m2"]
+            assert 1.0 < kwh < 600.0, f"{region} {name} at {kwh} kWh/m2 looks like a unit error"
+            assert entry["samples"] >= 30, (region, name)
+            # Delivered heat includes everything fuel-only did and more, so it
+            # can never be the smaller figure.
+            assert kwh >= entry["kwh_per_m2_fuel_only"], (region, name)
+            assert entry["counterfactual"] in ("gas", "electric_resistance", "heat_pump"), (
+                region,
+                name,
+            )
+
+
+def test_shipped_table_records_its_basis(shipped: dict) -> None:
+    """The basis a number was computed on belongs in the file next to it."""
+    basis = shipped["basis"]
+    for key in ("quantity", "combustion", "electric_heating", "counterfactual", "monthly"):
+        assert basis[key], key
+    assert "delivered heat" in basis["quantity"]
+
+
+def test_office_intensity_in_4a_is_in_range(shipped: dict) -> None:
+    """Delivered-heat sanity for the one region shipped so far. The fuel-only
+    figure was 10 kWh/m2; delivered is roughly four times that, because half
+    the stock is resistance-heated and the fuel columns never saw it."""
+    if shipped["climate_zone"] != "4A":
+        pytest.skip("range is for climate zone 4A")
+    large = shipped["by_type"]["LargeOffice"]
+    assert 30.0 <= large["kwh_per_m2"] <= 150.0, large["kwh_per_m2"]
+    assert large["counterfactual"] == "electric_resistance"
 
 
 def test_winter_outweighs_summer_in_every_shipped_profile(shipped: dict) -> None:

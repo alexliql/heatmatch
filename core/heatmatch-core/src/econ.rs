@@ -4,7 +4,13 @@
 //! README's limitations before treating any of it as a number to spend money
 //! against.
 
+use crate::types::Counterfactual;
 use crate::weights::Econ;
+
+/// Heat a heat pump delivers per unit of electricity it draws, for a building
+/// that already has one. Displacing it saves only the electricity, not the
+/// heat, so the avoided cost per delivered MWh is `elec_price / this`.
+pub const EXISTING_HEAT_PUMP_COP: f32 = 3.0;
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Economics {
@@ -19,6 +25,27 @@ pub struct Connection {
     pub delivered_mwh: f32,
     /// `None` when the heat is hot enough to use directly.
     pub cop: Option<f32>,
+    /// What the sink heats with today, which is what the connection displaces.
+    pub counterfactual: Counterfactual,
+}
+
+/// What `delivered_mwh` of heat is worth to a sink, given what it would
+/// otherwise have paid for it.
+///
+/// Written as `delivered * price / divisor`, not `delivered * (price /
+/// divisor)`: the two differ by an ulp, and the gas arm must reproduce the
+/// pre-counterfactual formula bit for bit so that a dataset with no
+/// counterfactual information — all gas, as New York is — prices exactly as
+/// it always did.
+pub fn avoided_cost(delivered_mwh: f32, c: Counterfactual, e: &Econ) -> f32 {
+    match c {
+        // Gas bought at the meter, burnt at boiler efficiency.
+        Counterfactual::Gas => delivered_mwh * e.gas_price_per_mwh_th / e.boiler_eff,
+        // A full MWh of electricity per MWh of heat.
+        Counterfactual::ElectricResistance => delivered_mwh * e.elec_price_per_mwh,
+        // Only the electricity the pump would have drawn.
+        Counterfactual::HeatPump => delivered_mwh * e.elec_price_per_mwh / EXISTING_HEAT_PUMP_COP,
+    }
 }
 
 /// Cost out a set of connections.
@@ -59,12 +86,34 @@ pub fn evaluate(connections: &[Connection], delivered_mwh: f32, e: &Econ, hours:
         })
         .sum();
 
-    // Gas displaced at the boiler, less the electricity the heat pumps draw,
-    // plus the cooling the data center no longer has to run.
-    let gas_saved = delivered_mwh * e.gas_price_per_mwh_th / e.boiler_eff;
+    // Heat displaced at whatever each sink would otherwise have paid for it,
+    // less the electricity the heat pumps draw, plus the cooling the data
+    // center no longer has to run.
+    //
+    // Priced on the *seasonal* total, which is what the savings have always
+    // been based on. When every sink shares one counterfactual that is a
+    // single call; a mixed set is priced per allocation and scaled to the
+    // seasonal total. The uniform path is not an optimisation: a weighted mean
+    // of identical values rounds back to the value only almost always, and
+    // "almost" is one ulp on savings, which the regression snapshot rightly
+    // refuses.
+    let heat_saved = match connections.first().map(|c| c.counterfactual) {
+        None => 0.0,
+        Some(first) if connections.iter().all(|c| c.counterfactual == first) => {
+            avoided_cost(delivered_mwh, first, e)
+        }
+        Some(_) => {
+            let allocated: f32 = connections.iter().map(|c| c.delivered_mwh).sum();
+            let per_allocation: f32 = connections
+                .iter()
+                .map(|c| avoided_cost(c.delivered_mwh, c.counterfactual, e))
+                .sum();
+            per_allocation / allocated * delivered_mwh
+        }
+    };
     let elec_cost = hp_elec_mwh * e.elec_price_per_mwh;
     let cooling_saved = delivered_mwh * e.dc_avoided_cooling_per_mwh;
-    let annual_savings = gas_saved - elec_cost + cooling_saved;
+    let annual_savings = heat_saved - elec_cost + cooling_saved;
 
     Economics {
         capex,

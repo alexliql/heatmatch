@@ -20,6 +20,7 @@ import {
   CAT_LABELS,
   CONFIDENCE_LABELS,
   CONFIDENCE_MARKS,
+  COUNTERFACTUAL_LABELS,
   DEMAND_SOURCE_LABELS,
   REGION_LABELS,
   type SinkCat,
@@ -202,6 +203,9 @@ export function DcDetail({ onBack }: { onBack: () => void }) {
                             {[
                               named ? label : "unnamed",
                               DEMAND_SOURCE_LABELS[sinks.get(c.sink)?.demand_source ?? ""],
+                              // Gas is the default and the common case; only
+                              // say so when the building is something else.
+                              c.counterfactual !== "gas" ? COUNTERFACTUAL_LABELS[c.counterfactual] : "",
                               c.crosses_water ? "crosses water" : "",
                               contested.has(c.sink) ? "also claimed nearby" : "",
                             ]

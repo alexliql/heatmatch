@@ -13,8 +13,6 @@ import requests
 @pytest.fixture(autouse=True)
 def _no_network(monkeypatch: pytest.MonkeyPatch) -> None:
     def blocked(*args, **kwargs):
-        raise AssertionError(
-            "test attempted a network request; stub the source or use a fixture"
-        )
+        raise AssertionError("test attempted a network request; stub the source or use a fixture")
 
     monkeypatch.setattr(requests.sessions.Session, "request", blocked)

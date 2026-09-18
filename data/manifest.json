@@ -1,19 +1,19 @@
 {
-  "built_at": "2026-09-17T21:41:21+00:00",
+  "built_at": "2026-09-18T04:29:37+00:00",
   "datacenters": {
-    "count": 303,
-    "file": "datacenters.ffbd5c3c.geojson",
-    "hash": "ffbd5c3cf5b645510e05937885e382a077ab337731f8a7258a34b1d8d5adc67a"
+    "count": 438,
+    "file": "datacenters.6497644c.geojson",
+    "hash": "6497644c8eda6e6fc2df52e1e0101ec42c91a49d00a7fec2a02760cad7c37d44"
   },
   "profiles": {
-    "count": 1,
-    "file": "profiles.09ab5abd.json",
-    "hash": "09ab5abd3fad20edfeb208ad42d0a622cfa44dfb6633945e54b57c1f9baad42d"
+    "count": 6,
+    "file": "profiles.13be263a.json",
+    "hash": "13be263a6737e2fe03f4101be5e84229f0e8b82db2c55d3723bbee4250f487cb"
   },
   "sinks": {
-    "count": 1533,
-    "file": "sinks.8d84d767.geojson",
-    "hash": "8d84d76789c20fe87d2db0a165c22e5e163ee9de85ab4bd3be61010cb09c756f"
+    "count": 3157,
+    "file": "sinks.ac3cf4a7.geojson",
+    "hash": "ac3cf4a7445ec0e8d6154fb391f26b81aaaa8d11012109bc3f800d8fcede4ceb"
   },
   "sources": [
     {
@@ -59,20 +59,66 @@
       "url": "https://registry.opendata.aws/nrel-pds-building-stock/"
     },
     {
-      "id": "manual_nova_mw",
+      "id": "manual_curated_mw",
       "license": "CC0-1.0",
-      "note": "Hand-curated Northern Virginia capacities; per-row provenance in the file.",
-      "url": "https://github.com/alexliql/heatmatch/blob/main/ingest/manual/nova_mw.csv"
+      "note": "Hand-curated capacities, one <region>_mw.csv per region; per-row provenance in each file.",
+      "url": "https://github.com/alexliql/heatmatch/tree/main/ingest/manual"
+    },
+    {
+      "id": "manual_seed_dcs",
+      "license": "CC0-1.0",
+      "note": "Hand-seeded data center sites from operator pages; per-row provenance in each file.",
+      "url": "https://github.com/alexliql/heatmatch/tree/main/ingest/manual"
+    },
+    {
+      "id": "seattle_bench",
+      "license": "public-domain",
+      "note": "City of Seattle Building Energy Benchmarking, latest reported year; buildings >= 20,000 sq ft.",
+      "url": "https://data.seattle.gov/d/teqw-tu6e"
+    },
+    {
+      "id": "ab802",
+      "license": "public-domain",
+      "note": "California Energy Commission, AB 802 Building Energy Benchmarking public disclosure, reporting year 2024; buildings >= 50,000 sq ft.",
+      "url": "https://www.energy.ca.gov/programs-and-topics/programs/building-energy-benchmarking-program"
+    },
+    {
+      "id": "pdx_bench",
+      "license": "public-domain",
+      "note": "City of Portland Energy Performance Reporting does break out natural gas, but publishes addresses and tax-lot ids with no coordinates, and covers Portland city limits only \u2014 the data centers are in Hillsboro. Portland sinks are ComStock-modelled.",
+      "status": "not_used",
+      "url": "https://www.portland.gov/bps/climate-action/energy-reporting"
+    },
+    {
+      "id": "la_ebewe",
+      "license": "public-domain",
+      "note": "City of Los Angeles EBEWE disclosure carries site and source EUI only, with no fuel breakdown and no coordinates. AB 802 covers Los Angeles buildings of 50,000 sq ft and up with separate fuel fields and geocodes, and is used instead.",
+      "status": "not_used",
+      "url": "https://data.lacity.org/d/9yda-i4ya"
+    },
+    {
+      "id": "wa_clean_buildings",
+      "license": "unknown",
+      "note": "Washington Clean Buildings Performance Standard; per-building public disclosure not verified.",
+      "status": "not_used_unverified",
+      "url": "https://www.commerce.wa.gov/growing-the-economy/energy/buildings/clean-buildings-standards/"
+    },
+    {
+      "id": "or_bps",
+      "license": "unknown",
+      "note": "Oregon Building Performance Standard; per-building public disclosure not verified.",
+      "status": "not_used_unverified",
+      "url": "https://www.oregon.gov/energy/save-energy/Pages/BPS.aspx"
     }
   ],
   "water": {
-    "count": 388,
-    "file": "water.31eccf31.geojson",
-    "hash": "31eccf310a6770b8cd7365daef63c2192b1f5cf2708c69aa97e588c52929ec4c"
+    "count": 555,
+    "file": "water.abccf338.geojson",
+    "hash": "abccf3387dcb5283fd749960f6d62c385d08b9b4373f4ad2b4718c9f9dc0d7fd"
   },
   "zones": {
-    "count": 1,
-    "file": "zones.943d5511.geojson",
-    "hash": "943d551110de0095e6422d4cbb8ff66aa5c40974f1b649c9ff61ef00411b5b2b"
+    "count": 2,
+    "file": "zones.f0a4b803.geojson",
+    "hash": "f0a4b8033e4605baae922ee5541c72556352677bdb78560cddff20918fd671e7"
   }
 }

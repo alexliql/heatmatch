@@ -20,7 +20,27 @@ def test_region_for_prefers_nyc_over_containing_upstate_bbox() -> None:
     # feature would be emitted twice.
     assert region_for(40.7128, -74.0060) == "nyc"
     assert region_for(42.8864, -78.8784) == "upstate"
-    assert region_for(34.0522, -118.2437) is None
+    # Somewhere no region claims: Denver.
+    assert region_for(39.7392, -104.9903) is None
+
+
+def test_every_region_claims_its_own_downtown() -> None:
+    assert region_for(39.0438, -77.4874) == "nova"  # Ashburn
+    assert region_for(47.6062, -122.3321) == "seattle"
+    assert region_for(45.5231, -122.9895) == "pdx"  # Hillsboro
+    assert region_for(37.3541, -121.9552) == "svy"  # Santa Clara
+    assert region_for(34.0522, -118.2437) == "la"
+    assert region_for(38.5816, -121.4944) == "sac"
+
+
+def test_orange_county_is_inside_the_la_region() -> None:
+    """`region_for` tests the bbox before any county clip runs, so a bbox that
+    stopped at the LA county line would silently drop every Orange County
+    site. The earlier draft's bbox did exactly that."""
+    assert region_for(33.6846, -117.8265) == "la"  # Irvine
+    assert region_for(33.8366, -117.9143) == "la"  # Anaheim
+    # And it does not leak south into San Diego County.
+    assert region_for(32.7157, -117.1611) is None
 
 
 def test_mw_from_sqft_matches_75w_per_sqft() -> None:
@@ -68,7 +88,26 @@ def test_zero_area_does_not_produce_zero_demand() -> None:
     assert demand > 0
 
 
-@pytest.mark.parametrize("raw,expected", [("5", 5.0), ("3;4", 3.0), (None, None), ("abc", None), ("0", None)])
+@pytest.mark.parametrize(
+    "raw,expected", [("5", 5.0), ("3;4", 3.0), (None, None), ("abc", None), ("0", None)]
+)
 def test_floors_parsing(raw: str | None, expected: float | None) -> None:
     tags = {} if raw is None else {"building:levels": raw}
     assert _floors(tags, "office") == (expected if expected else FLOORS_GUESS["office"])
+
+
+def test_only_seattle_keeps_its_steam_heated_sinks() -> None:
+    """Enwave's customers are the natural offtakers of a network-level swap.
+    Everywhere else a district-steam building already has its heat."""
+    from ingest.config import REGIONS, keep_steam_heated
+
+    assert keep_steam_heated("seattle") is True
+    for region in REGIONS:
+        if region != "seattle":
+            assert keep_steam_heated(region) is False, region
+
+
+def test_apartments_are_collected_where_they_are_dense() -> None:
+    from ingest.config import MULTIFAMILY_REGIONS
+
+    assert MULTIFAMILY_REGIONS == {"nyc", "la"}

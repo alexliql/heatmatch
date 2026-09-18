@@ -14,8 +14,14 @@ from ingest.schema import DataCenter
 
 def _dc(idx: int, lat: float, lon: float, name: str) -> DataCenter:
     return DataCenter(
-        id=f"dc_nyc_{idx:04d}", name=name, region="nyc", lat=lat, lon=lon,
-        mw=1.0, mw_source="atlas_default", sources=["test"],
+        id=f"dc_nyc_{idx:04d}",
+        name=name,
+        region="nyc",
+        lat=lat,
+        lon=lon,
+        mw=1.0,
+        mw_source="atlas_default",
+        sources=["test"],
     )
 
 
@@ -36,16 +42,33 @@ def test_feature_has_lon_lat_order_and_six_decimals() -> None:
 def test_properties_match_the_schema_contract() -> None:
     props = emit.to_feature(_dc(1, 40.7, -74.0, "X"))["properties"]
     assert set(props) == {
-        "id", "name", "region", "in_steam", "in_uten", "sources",
-        "mw", "mw_source", "mw_confidence", "campus_id", "cooling",
+        "id",
+        "name",
+        "region",
+        "in_steam",
+        "in_uten",
+        "sources",
+        "mw",
+        "mw_source",
+        "mw_confidence",
+        "campus_id",
+        "cooling",
     }
     # Derived from mw_source, never passed in, so the two cannot disagree.
     assert props["mw_confidence"] == "footprint_estimate"
 
 
 def _row(name: str, region: str, lat: float, lon: float) -> dict:
-    return {"name": name, "region": region, "lat": lat, "lon": lon, "mw": 1.0,
-            "mw_source": "atlas_default", "cooling": "unknown", "sources": ["t"]}
+    return {
+        "name": name,
+        "region": region,
+        "lat": lat,
+        "lon": lon,
+        "mw": 1.0,
+        "mw_source": "atlas_default",
+        "cooling": "unknown",
+        "sources": ["t"],
+    }
 
 
 def _only_pnnl(monkeypatch, rows: list[dict]) -> None:
@@ -57,7 +80,9 @@ def _only_pnnl(monkeypatch, rows: list[dict]) -> None:
     monkeypatch.setattr(pluto, "candidates", none)
     monkeypatch.setattr(nys_parcels, "candidates", none)
     monkeypatch.setattr(
-        pnnl, "candidates", lambda region, refresh=False: iter([r for r in rows if r["region"] == region])
+        pnnl,
+        "candidates",
+        lambda region, refresh=False: iter([r for r in rows if r["region"] == region]),
     )
 
 

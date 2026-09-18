@@ -67,10 +67,31 @@ pub enum Region {
     /// Northern Virginia: Loudoun, Prince William, Fairfax, Arlington,
     /// Alexandria, Manassas and Manassas Park.
     Nova,
+    /// King, Snohomish and Pierce counties.
+    Seattle,
+    /// Portland metro: Washington, Multnomah and Clackamas counties. The data
+    /// centers are in Hillsboro.
+    Pdx,
+    /// Silicon Valley: Santa Clara, San Mateo and Alameda counties.
+    Svy,
+    /// Los Angeles and Orange counties.
+    La,
+    /// Sacramento and Placer counties — the inland control for California:
+    /// same measured-data source as the coast, colder winters, cheaper power.
+    Sac,
 }
 
 impl Region {
-    pub const ALL: [Region; 3] = [Region::Nyc, Region::Upstate, Region::Nova];
+    pub const ALL: [Region; 8] = [
+        Region::Nyc,
+        Region::Upstate,
+        Region::Nova,
+        Region::Seattle,
+        Region::Pdx,
+        Region::Svy,
+        Region::La,
+        Region::Sac,
+    ];
 
     /// Projection origin, matching the `origin` values in ingest's config.
     pub fn origin(self) -> (f64, f64) {
@@ -78,6 +99,11 @@ impl Region {
             Region::Nyc => (40.7128, -74.0060),
             Region::Upstate => (42.90, -75.50),
             Region::Nova => (39.02, -77.45),
+            Region::Seattle => (47.61, -122.33),
+            Region::Pdx => (45.52, -122.90),
+            Region::Svy => (37.38, -121.95),
+            Region::La => (34.05, -118.25),
+            Region::Sac => (38.58, -121.35),
         }
     }
 
@@ -86,6 +112,11 @@ impl Region {
             Region::Nyc => "nyc",
             Region::Upstate => "upstate",
             Region::Nova => "nova",
+            Region::Seattle => "seattle",
+            Region::Pdx => "pdx",
+            Region::Svy => "svy",
+            Region::La => "la",
+            Region::Sac => "sac",
         }
     }
 }
@@ -148,6 +179,28 @@ pub struct DataCenter {
     pub in_uten: bool,
 }
 
+/// What a sink heats with today — and therefore what a heat network would
+/// displace.
+///
+/// The economics price avoided cost per delivered MWh, and that depends
+/// entirely on this: displacing a gas boiler saves gas at boiler efficiency,
+/// displacing resistance heat saves a full MWh of electricity, and displacing
+/// a heat pump saves only the third or so of a MWh the pump would have drawn.
+/// In California and Seattle a resistance-heated building is the best sink on
+/// the map; without this field the model would call it worthless.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "ts", derive(tsify_next::Tsify))]
+#[cfg_attr(feature = "ts", tsify(into_wasm_abi, from_wasm_abi))]
+pub enum Counterfactual {
+    /// A gas (or oil, or propane) boiler or furnace. The default, and what
+    /// every New York sink is, so their economics do not move.
+    #[default]
+    Gas,
+    ElectricResistance,
+    HeatPump,
+}
+
 /// A potential heat consumer.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Sink {
@@ -157,8 +210,11 @@ pub struct Sink {
     pub lat: f64,
     pub lon: f64,
     pub cat: SinkCat,
-    /// Annual thermal demand in kWh. Converted to MWh on the way into scoring.
+    /// Annual thermal demand in kWh, as *delivered heat*. Converted to MWh on
+    /// the way into scoring.
     pub demand_kwh: f32,
+    #[serde(default)]
+    pub counterfactual: Counterfactual,
     #[serde(default)]
     pub in_steam: bool,
     #[serde(default)]
@@ -181,6 +237,9 @@ pub struct Contribution {
     #[cfg_attr(feature = "ts", tsify(type = "string"))]
     pub sink: Id,
     pub cat: SinkCat,
+    /// What this sink heats with today, so the detail view can say what the
+    /// connection would displace.
+    pub counterfactual: Counterfactual,
     /// Straight-line distance.
     pub dist_m: f32,
     /// Distance the pipe actually runs, per the distance model, including any

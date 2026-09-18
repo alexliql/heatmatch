@@ -1,0 +1,13 @@
+# Seeded Sacramento data centers. The Atlas already maps the large McClellan
+# Park campus (NTT / RagingWire CA1–CA3, QTS) and EdgeConneX; this adds what
+# it misses. Sacramento is the inland control for California — same measured
+# data as the coast, colder winters, cheaper municipal power — and needs only
+# enough sites to serve that.
+#
+# Columns: name, lat, lon, operator, density, sqft, source_url, source_date, note
+#
+# Not seeded: Prime SMF01-02 (2408 AK St, 150,000 sq ft, 18 MW) — under
+# construction at the time of writing, per the operator's own page.
+#
+name,lat,lon,operator,density,sqft,source_url,source_date,note
+Prime Data Centers SMF01-01,38.6625,-121.3985,Prime Data Centers,purpose_built,65000,https://primedatacenters.com/locations/sacramento/,2026-09-18,2407 AK St, McClellan Park; operator states 65,000 sq ft and 8 MW, operational. Coordinate from the street address.

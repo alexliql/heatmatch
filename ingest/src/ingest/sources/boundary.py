@@ -36,27 +36,25 @@ def _state_prepared(fips: str):
     return prep(match.union_all())
 
 
-@lru_cache(maxsize=4)
-def _counties_prepared(fips: str, names: tuple[str, ...]):
+@lru_cache(maxsize=8)
+def _counties_prepared(state_fips: str, county_fips: tuple[str, ...]):
     path = cached_get(COUNTY_BOUNDARY_URL, "tl_2024_us_county.zip")
     counties = gpd.read_file(path)
-    in_state = counties.loc[counties["STATEFP"] == fips]
-    # NAMELSAD, not NAME: Virginia's independent cities share their names with
-    # the counties around them, so "Fairfax" matches both Fairfax County and
-    # the City of Fairfax. Only the suffixed form is unambiguous.
-    wanted = in_state.loc[in_state["NAMELSAD"].isin(names)]
-    missing = set(names) - set(wanted["NAMELSAD"])
+    in_state = counties.loc[counties["STATEFP"] == state_fips]
+    # FIPS codes, not names: Virginia's independent cities share their names
+    # with the counties around them, so "Fairfax" is both 059 and 600.
+    wanted = in_state.loc[in_state["COUNTYFP"].isin(county_fips)]
+    missing = set(county_fips) - set(wanted["COUNTYFP"])
     if missing:
-        raise RuntimeError(f"no county named {sorted(missing)} in state {fips}")
+        raise RuntimeError(f"no county {sorted(missing)} in state {state_fips}")
     return prep(wanted.union_all())
 
 
-@lru_cache(maxsize=8)
+@lru_cache(maxsize=16)
 def _clip(region: RegionName):
     cfg = REGIONS[region]
-    names = cfg.get("jurisdictions")
-    if names:
-        return _counties_prepared(cfg["state_fips"], tuple(names))
+    if cfg.get("clip") == "counties":
+        return _counties_prepared(cfg["state_fips"], tuple(cfg["county_fips"]))
     return _state_prepared(cfg["state_fips"])
 
 
@@ -65,23 +63,6 @@ def in_region_boundary(lat: float, lon: float, region: RegionName) -> bool:
     return _clip(region).contains(Point(lon, lat))
 
 
-def county_codes(region: RegionName, *, refresh: bool = False) -> list[str]:
-    """County FIPS codes for a region's named jurisdictions.
-
-    Read from TIGER rather than hardcoded: the file is already downloaded for
-    the clip, and a hand-written table of Virginia independent-city codes is
-    exactly the kind of thing that rots without anyone noticing.
-    """
-    cfg = REGIONS[region]
-    names = cfg.get("jurisdictions")
-    if not names:
-        return []
-    path = cached_get(COUNTY_BOUNDARY_URL, "tl_2024_us_county.zip", refresh=refresh)
-    counties = gpd.read_file(path)
-    match = counties.loc[
-        (counties["STATEFP"] == cfg["state_fips"]) & (counties["NAMELSAD"].isin(names))
-    ]
-    missing = set(names) - set(match["NAMELSAD"])
-    if missing:
-        raise RuntimeError(f"no county named {sorted(missing)} in state {cfg['state_fips']}")
-    return sorted(match["COUNTYFP"])
+def county_codes(region: RegionName) -> list[str]:
+    """County FIPS codes a region's ComStock table is built from."""
+    return sorted(REGIONS[region].get("county_fips", ()))
