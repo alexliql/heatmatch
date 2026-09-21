@@ -1,4 +1,4 @@
-"""LL84 fuel arithmetic and the tax-lot join (§3.3)."""
+"""LL84 fuel arithmetic and the tax-lot join."""
 
 from ingest.config import KBTU_TO_KWH
 from ingest.sources import ll84

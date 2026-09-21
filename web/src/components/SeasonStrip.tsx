@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 
 import { num } from "@/lib/format";
-import { useStore } from "@/lib/store";
+import { useSelectedMatch, useStore } from "@/lib/store";
 import { CAT_LABELS, type SinkCat } from "@/lib/types";
 import { useCoarsePointer } from "@/lib/useMedia";
 
@@ -25,15 +25,14 @@ const BAR_W = (W - GAP * 11) / 12;
  *  demand — the clearest way to show why utilization is below 100%. Drawn as
  *  SVG so the supply line is clamped inside the plot whatever the ratio.
  *  Hover or arrow through a month to see which categories drive it. */
-export function SeasonStrip({ dcId }: { dcId: string }) {
+export function SeasonStrip() {
   const engine = useStore((s) => s.engine);
   const explain = useStore((s) => s.explain);
-  const results = useStore((s) => s.results);
+  const match = useSelectedMatch();
   const [month, setMonth] = useState<number | null>(null);
   const coarse = useCoarsePointer();
 
   const data = useMemo(() => {
-    const match = results.find((r) => r.dc === dcId);
     if (!engine || !match) return null;
     // Shapes are per region: Virginia models its own from ComStock.
     const profiles = engine.profiles(match.region);
@@ -51,7 +50,7 @@ export function SeasonStrip({ dcId }: { dcId: string }) {
     const supply = match.supply_mwh / 12;
     const peak = Math.max(supply, ...monthly) || 1;
     return { monthly, byCat, supply, peak };
-  }, [engine, explain, results, dcId]);
+  }, [engine, explain, match]);
 
   if (!data) return null;
 

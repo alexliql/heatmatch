@@ -3,41 +3,16 @@
 //! intended and understood, and say which moved and why in the commit:
 //! `cargo run --release --example baseline -p heatmatch-core`
 
-use std::fs;
-use std::path::PathBuf;
+#[path = "../tests/support/mod.rs"]
+mod support;
 
-use heatmatch_core::{DataCenter, Econ, Engine, Region, Sink, Weights};
+use std::fs;
+
+use heatmatch_core::{Econ, Engine, Region, Weights};
 use serde_json::{json, Map, Value};
 
-fn flatten(feature: &Value) -> Map<String, Value> {
-    let mut props = feature["properties"].as_object().cloned().unwrap();
-    let c = feature["geometry"]["coordinates"].as_array().unwrap();
-    props.insert("lon".into(), c[0].clone());
-    props.insert("lat".into(), c[1].clone());
-    props
-}
-
-fn features(prefix: &str) -> Vec<Value> {
-    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../data");
-    let path = fs::read_dir(dir)
-        .unwrap()
-        .filter_map(Result::ok)
-        .map(|e| e.path())
-        .find(|p| p.file_name().unwrap().to_str().unwrap().starts_with(prefix))
-        .expect("asset");
-    let raw: Value = serde_json::from_str(&fs::read_to_string(path).unwrap()).unwrap();
-    raw["features"].as_array().cloned().unwrap()
-}
-
 fn main() {
-    let dcs: Vec<DataCenter> = features("datacenters.")
-        .iter()
-        .map(|f| serde_json::from_value(Value::Object(flatten(f))).unwrap())
-        .collect();
-    let sinks: Vec<Sink> = features("sinks.")
-        .iter()
-        .map(|f| serde_json::from_value(Value::Object(flatten(f))).unwrap())
-        .collect();
+    let (dcs, sinks) = support::committed();
 
     // Keyed by name, not id: region-prefixed ids renumber, the physics does not.
     let names: std::collections::HashMap<String, String> =
@@ -73,7 +48,7 @@ fn main() {
         out.insert(region.as_str().to_string(), Value::Array(rows));
     }
 
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/baseline.json");
+    let path = support::fixture("baseline.json");
     fs::write(
         &path,
         serde_json::to_string_pretty(&Value::Object(out)).unwrap() + "\n",

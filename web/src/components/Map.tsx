@@ -28,7 +28,7 @@ import {
 } from "@/lib/format";
 import { SHEET_SNAPS, resolvedTheme, useStore } from "@/lib/store";
 import { isCoarsePointer, layoutMode } from "@/lib/useMedia";
-import { CAT_LABELS, type RegionView, type SinkCat } from "@/lib/types";
+import { CAT_LABELS, type DcFeature, type RegionView, type SinkCat } from "@/lib/types";
 
 import "maplibre-gl/dist/maplibre-gl.css";
 
@@ -133,18 +133,9 @@ function chromePadding(): PaddingOptions {
 }
 
 function dcBounds(engine: Engine, region: RegionView = "all"): LngLatBoundsLike | null {
-  const fc = engine.geo.datacenters as
-    | {
-        features: {
-          properties: { region: string };
-          geometry: { coordinates: [number, number] };
-        }[];
-      }
-    | undefined;
-  const features = (fc?.features ?? []).filter(
-    (f) => region === "all" || f.properties.region === region,
-  );
-  const coords = features.map((f) => f.geometry.coordinates);
+  const coords = engine.geo.datacenters.features
+    .filter((f) => region === "all" || f.properties.region === region)
+    .map((f) => f.geometry.coordinates);
   if (coords.length === 0) return null;
   const lons = coords.map((c) => c[0]);
   const lats = coords.map((c) => c[1]);
@@ -153,6 +144,13 @@ function dcBounds(engine: Engine, region: RegionView = "all"): LngLatBoundsLike 
     [Math.max(...lons), Math.max(...lats)],
   ];
 }
+
+function dcPosition(engine: Engine, id: string | null): [number, number] | undefined {
+  return engine.geo.datacenters.features.find((f) => f.properties.id === id)?.geometry.coordinates;
+}
+
+const HOVERED: ExpressionSpecification = ["boolean", ["feature-state", "hover"], false];
+const SELECTED: ExpressionSpecification = ["boolean", ["feature-state", "selected"], false];
 
 /** Everything that depends on the style: sources, images, layers. Runs on
  *  first load and again after a theme swap, which drops all of it. */
@@ -285,9 +283,7 @@ function buildLayers(m: MlMap, engine: Engine, pal: Palette) {
     },
   });
 
-  const hovered: ExpressionSpecification = ["boolean", ["feature-state", "hover"], false];
-  const selected: ExpressionSpecification = ["boolean", ["feature-state", "selected"], false];
-  const radius: ExpressionSpecification = ["*", DC_RADIUS, ["case", hovered, 1.2, 1]];
+  const radius: ExpressionSpecification = ["*", DC_RADIUS, ["case", HOVERED, 1.2, 1]];
 
   // A soft halo in the ground colour separates the mark from the basemap
   // without the hard white edge a stroke would give.
@@ -354,11 +350,11 @@ function buildLayers(m: MlMap, engine: Engine, pal: Palette) {
       "circle-radius": radius,
       "circle-color": bucketColor,
       // The ring carries the colour when the fill is too faint to.
-      "circle-stroke-width": ["case", selected, 2, stated, 0, 1.5],
-      "circle-stroke-color": ["case", selected, pal.accent, bucketColor],
+      "circle-stroke-width": ["case", SELECTED, 2, stated, 0, 1.5],
+      "circle-stroke-color": ["case", SELECTED, pal.accent, bucketColor],
       "circle-opacity": [
         "case",
-        ["any", selected, hovered], fill(1, 0.7, 0.35),
+        ["any", SELECTED, HOVERED], fill(1, 0.7, 0.35),
         fill(0.9, 0.45, 0.15),
       ],
     },
@@ -450,7 +446,7 @@ export function Map() {
       m.getCanvas().style.cursor = "pointer";
       const f = e.features?.[0];
       if (!f) return;
-      const p = f.properties as { id: string; name: string; mw: number };
+      const p = f.properties as DcFeature;
       const match = useStore.getState().results.find((r) => r.dc === p.id);
       useStore.getState().hoverDc(p.id);
       const bucket = paybackBucket(match?.payback_yrs);
@@ -609,9 +605,7 @@ export function Map() {
     if (hoveredDc) m.setFeatureState({ source: "dcs", id: hoveredDc }, { hover: true });
     prevHover.current = hoveredDc;
 
-    const hovered: ExpressionSpecification = ["boolean", ["feature-state", "hover"], false];
-    const selected: ExpressionSpecification = ["boolean", ["feature-state", "selected"], false];
-    const keep: ExpressionSpecification = ["any", hovered, selected];
+    const keep: ExpressionSpecification = ["any", HOVERED, SELECTED];
     m.setPaintProperty("dcs-circle", "circle-opacity", ["case", keep, 1, hoveredDc ? 0.35 : 0.9]);
     m.setPaintProperty("dcs-halo", "circle-opacity", ["case", keep, 0.85, hoveredDc ? 0.3 : 0.85]);
     // The selection's rings follow the same rule when the cursor is on a
@@ -648,11 +642,8 @@ export function Map() {
     }
 
     const { selectionSource, results: rs } = useStore.getState();
-    const fc = engine.geo.datacenters as
-      | { features: { properties: { id: string }; geometry: { coordinates: [number, number] } }[] }
-      | undefined;
-    const site = fc?.features.find((f) => f.properties.id === selectedDc);
-    if (!site) return;
+    const center = dcPosition(engine, selectedDc);
+    if (!center) return;
     const region = rs.find((r) => r.dc === selectedDc)?.region;
 
     // A tick later, so the panel's own reaction to the selection (the
@@ -661,7 +652,7 @@ export function Map() {
     const fly = setTimeout(() => {
       if (selectionSource === "list") {
         m.flyTo({
-          center: site.geometry.coordinates,
+          center,
           zoom: siteZoom,
           padding: chromePadding(),
           duration: 1100,
@@ -669,7 +660,7 @@ export function Map() {
         });
       } else {
         m.easeTo({
-          center: site.geometry.coordinates,
+          center,
           zoom: Math.max(m.getZoom(), Math.min(siteZoom, 12)),
           padding: chromePadding(),
           duration: 600,
@@ -709,10 +700,7 @@ export function Map() {
     const lbl = m.getSource("ring-label") as { setData?: (d: unknown) => void } | undefined;
     if (!src?.setData || !lbl?.setData) return;
 
-    const fc = engine?.geo.datacenters as
-      | { features: { properties: { id: string }; geometry: { coordinates: [number, number] } }[] }
-      | undefined;
-    const site = fc?.features.find((f) => f.properties.id === selectedDc);
+    const site = engine && dcPosition(engine, selectedDc);
     const region = results.find((r) => r.dc === selectedDc)?.region;
     if (!site || !weights || !region) {
       src.setData(EMPTY);
@@ -725,7 +713,7 @@ export function Map() {
     const radiusKm = w.radius_m / 1000;
     const detour =
       w.distance.kind === "detour" ? w.distance.k : w.distance.kind === "rotated_l1" ? Math.SQRT2 : 1;
-    const [lng, lat] = site.geometry.coordinates;
+    const [lng, lat] = site;
     src.setData({
       type: "FeatureCollection",
       features: [

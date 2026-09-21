@@ -1,41 +1,20 @@
-"""Data centers seeded by hand, for regions the Atlas barely covers.
-
-The IM3 Atlas is OpenStreetMap-derived, and OpenStreetMap's coverage of data
-centers is uneven: 79 buildings in Silicon Valley, 10 in Los Angeles, 5 in
-Sacramento. Where it is thin, building a county-parcel ingest to find the
-missing sites is a data-collection project wearing an ingest module's clothes.
-A cited list is the honest tool: each row is a real facility whose operator
-publishes its location and floor area, with the URL that says so.
-
-`manual/<region>_dcs.csv`, one file per region that needs one, columns:
+"""Data centers seeded by hand from operator pages, for regions the
+OpenStreetMap-derived Atlas barely covers (10 buildings in Los Angeles, 5 in
+Sacramento). `manual/<region>_dcs.csv` columns:
 
     name, lat, lon, operator, density, sqft, source_url, source_date, note
 
-`density` is what kind of building it is, and sets the W/sq ft applied to
-`sqft`: a purpose-built hall is mostly white space; a downtown carrier hotel is
-an office tower with a few floors of it. The result is `mw_source="seed_sqft"`,
-graded `footprint_estimate` — a stated floor area is better than an
-OpenStreetMap polygon, but it is still an area, not a capacity. A curated MW
-row can lift it from there.
-
-Seeds are also the supplement for Atlas-first regions where a spot-check
-fails: Seattle's downtown carrier hotels are seeded because the Atlas maps the
-Westin Building as an office, which it mostly is.
+`density` (purpose_built | carrier_hotel) sets the W/sq ft applied to `sqft`.
+The result is `mw_source="seed_sqft"`, graded `footprint_estimate`: a stated
+area is still an area, not a capacity. A curated MW row can lift it.
 """
 
-import csv
 from collections.abc import Iterator
-from pathlib import Path
 
-from ingest.config import (
-    MAX_ESTIMATED_DC_MW,
-    SEED_MW_PER_SQFT,
-    RegionName,
-    region_for,
-)
-from ingest.sources.boundary import in_region_boundary
+from ingest.config import MAX_ESTIMATED_DC_MW, SEED_MW_PER_SQFT, RegionName
+from ingest.sources.boundary import in_region
+from ingest.util import read_manual_csv
 
-MANUAL = Path(__file__).resolve().parents[3] / "manual"
 SEED_DCS_SOURCE = {
     "id": "manual_seed_dcs",
     "url": "https://github.com/alexliql/heatmatch/tree/main/ingest/manual",
@@ -45,12 +24,7 @@ SEED_DCS_SOURCE = {
 
 
 def _rows(region: RegionName) -> list[dict]:
-    path = MANUAL / f"{region}_dcs.csv"
-    if not path.exists():
-        return []
-    with path.open(newline="") as fh:
-        lines = [ln for ln in fh if ln.strip() and not ln.lstrip().startswith("#")]
-    return list(csv.DictReader(lines))
+    return read_manual_csv(f"{region}_dcs.csv")
 
 
 def candidates(region: RegionName, *, refresh: bool = False) -> Iterator[dict]:
@@ -65,9 +39,8 @@ def candidates(region: RegionName, *, refresh: bool = False) -> Iterator[dict]:
             continue
         if sqft <= 0:
             continue
-        # The same guard every source applies: a seeded coordinate can be
-        # wrong, and a wrong one must not land in another region.
-        if region_for(lat, lon) != region or not in_region_boundary(lat, lon, region):
+        # A seeded coordinate can be wrong, and must not land in another region.
+        if not in_region(lat, lon, region):
             continue
         yield {
             "name": row["name"].strip(),

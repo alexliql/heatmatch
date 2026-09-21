@@ -6,11 +6,11 @@
 
 import { useEffect, useState } from "react";
 
-export const SHEET_QUERY = "(max-width: 900px) and (orientation: portrait)";
-export const LANDSCAPE_QUERY = "(max-height: 520px) and (max-width: 1100px)";
-export const COARSE_QUERY = "(pointer: coarse)";
+const SHEET_QUERY = "(max-width: 900px) and (orientation: portrait)";
+const LANDSCAPE_QUERY = "(max-height: 520px) and (max-width: 1100px)";
+const COARSE_QUERY = "(pointer: coarse)";
 
-export type LayoutMode = "desktop" | "sheet" | "landscape";
+type LayoutMode = "desktop" | "sheet" | "landscape";
 
 export function layoutMode(): LayoutMode {
   if (typeof window === "undefined") return "desktop";
@@ -23,7 +23,7 @@ export function isCoarsePointer(): boolean {
   return typeof window !== "undefined" && window.matchMedia(COARSE_QUERY).matches;
 }
 
-export function useMediaQuery(q: string): boolean {
+function useMediaQuery(q: string): boolean {
   const [match, setMatch] = useState(false);
   useEffect(() => {
     const mq = window.matchMedia(q);

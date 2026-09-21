@@ -1,4 +1,4 @@
-//! Heat-pump sizing (HEATMATCH.md §4.4).
+//! Heat-pump sizing.
 //!
 //! Waste heat leaves a data center at a temperature set by its cooling system.
 //! If that is already hotter than the sink needs, the heat can be used
@@ -48,10 +48,8 @@ pub struct HeatPump {
 /// cannot reach the source temperature exactly, so the evaporator sees
 /// `supply - approach` while the condenser must reach `required`.
 ///
-/// §4.4 writes the Carnot denominator as `th - tc` with `tc = supply + 273.15`,
-/// which omits the approach — but its own worked example (air-cooled to a
-/// hospital, COP ≈ 0.5 * 348.15 / 45 ≈ 3.87) divides by the full 45 K lift,
-/// not 40 K. The example is the authority here, being a concrete number.
+/// The reference example (air-cooled to a hospital, COP ≈ 0.5 * 348.15 / 45
+/// ≈ 3.87) divides by the full 45 K lift including the approach.
 pub fn heat_pump(
     cooling: Cooling,
     cat: SinkCat,

@@ -19,7 +19,7 @@ export function ScoreRail({ sheet }: { sheet?: "peek" | "half" | "full" }) {
   const hoverDc = useStore((s) => s.hoverDc);
   const select = useStore((s) => s.select);
   const engine = useStore((s) => s.engine);
-  const { dcNames } = useFeatureIndex(engine);
+  const { dcName } = useFeatureIndex(engine);
 
   const max = useMemo(() => Math.max(0, ...results.map((r) => r.score)) || 1, [results]);
   if (!results.length) return null;
@@ -42,7 +42,7 @@ export function ScoreRail({ sheet }: { sheet?: "peek" | "half" | "full" }) {
               onClick={() => select(sel ? null : m.dc, "list")}
               style={{ cursor: "pointer" }}
             >
-              <title>{`${dcNames.get(m.dc) ?? m.dc} · ${score(m.score)}`}</title>
+              <title>{`${dcName(m.dc)} · ${score(m.score)}`}</title>
               <rect x={x(m.score) - 4} y={0} width={8} height={H} fill="transparent" />
               <rect
                 x={x(m.score) - w / 2}

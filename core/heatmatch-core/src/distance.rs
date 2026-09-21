@@ -1,4 +1,4 @@
-//! Distance models and the query radius they imply (HEATMATCH.md §4.3).
+//! Distance models and the query radius they imply.
 
 use crate::weights::DistanceModel;
 

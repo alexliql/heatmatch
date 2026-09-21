@@ -1,9 +1,6 @@
-"""Output schema — the contract with heatmatch-core (HEATMATCH.md §3.2).
-
-Property names here must match the serde field names in core/heatmatch-core's
-types.rs exactly. Nothing checks that automatically; changing a name here is a
-breaking change to the engine.
-"""
+"""Output schema: the contract with heatmatch-core. Property names must
+match the serde field names in core/heatmatch-core/src/types.rs; its
+tests/contract.rs checks the committed data against them."""
 
 from typing import Literal
 
@@ -11,35 +8,25 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 from ingest.config import MW_CONFIDENCE_BY_SOURCE, Counterfactual, RegionName, SinkCat
 
-# `pnnl` from §3.2 is deliberately absent: the Atlas publishes no capacity
-# field, so a MW value can never be sourced directly from it. Area-derived
-# estimates are `atlas_sqft`; footprint-less rows fall back to `atlas_default`.
+# Where `mw` came from: area-derived estimates, a hand-seeded floor area, or
+# a real figure (an operator statement is "reported", a filing is "filed").
 MwSource = Literal[
     "atlas_sqft",
     "atlas_default",
     "pluto_estimate",
     "parcel_estimate",
     "manual",
-    # A site seeded by hand from an operator's page, with its stated floor
-    # area: an estimate, from an area someone published.
     "seed_sqft",
-    # Some sites publish real capacities: an operator statement is "reported",
-    # a county approval or utility filing is "filed".
     "reported",
     "filed",
 ]
-# How far to trust `mw`. Derived from `mw_source` via config.confidence_for,
-# never set on its own, so the two cannot disagree.
+# Derived from `mw_source` via config.MW_CONFIDENCE_BY_SOURCE, never set alone.
 MwConfidence = Literal["reported", "filed", "parcel_estimate", "footprint_estimate"]
+# Measured (the first three), modelled, or estimated.
 DemandSource = Literal[
     "ll84_fuel",
-    # The other measured sources: California's statewide AB 802 disclosure
-    # and Seattle's city benchmarking. Portland's and Los Angeles's own
-    # programmes were checked and not used — see `cli.NOT_USED` for why.
     "ab802",
     "seattle_bench",
-    # Annual intensity from NREL ComStock times floor area. Modelled, not
-    # measured — the only option in states with no benchmarking disclosure.
     "comstock_modeled",
     "footprint_estimate",
     "category_default",
@@ -66,19 +53,13 @@ class DataCenter(_Located):
     mw_source: MwSource
     mw_confidence: MwConfidence
     cooling: Cooling = "unknown"
-    # Groups buildings on one campus, where the parcel data supports it.
-    # Carried for the UI; scoring stays per building.
+    # Buildings on one campus; carried for the UI, scoring stays per building.
     campus_id: str | None = None
 
     @model_validator(mode="before")
     @classmethod
     def _derive_confidence(cls, data: object) -> object:
-        """Fill `mw_confidence` from `mw_source`.
-
-        Derived rather than passed in, so no source module can state a
-        confidence that its own provenance does not support. A caller that
-        supplies one anyway must agree with the mapping.
-        """
+        """Fill `mw_confidence` from `mw_source`; a supplied one must agree."""
         if not isinstance(data, dict) or "mw_source" not in data:
             return data
         expected = MW_CONFIDENCE_BY_SOURCE.get(data["mw_source"])
@@ -102,23 +83,20 @@ class DataCenter(_Located):
 
 class Sink(_Located):
     cat: SinkCat
-    # Annual *delivered* heat, kWh — see config.BOILER_EFF for why not fuel.
+    # Annual *delivered* heat, kWh — see config.BOILER_EFF.
     demand_kwh: float = Field(gt=0)
     demand_source: DemandSource
-    # Set when a measurement was overruled; the only value so far is
-    # "measured_fuel_near_zero".
+    # Set when a measurement was overruled ("measured_fuel_near_zero").
     demand_note: str | None = None
-    # What the building heats with today. Gas unless something says otherwise,
-    # so every New York sink prices exactly as it did before the field existed.
+    # What the building heats with today; gas unless something says otherwise.
     counterfactual: Counterfactual = "gas"
-    # Ground footprint behind a modelled demand, when one is known.
+    # Ground footprint, and footprint × storeys, which is what a per-m2
+    # intensity applies to.
     area_m2: float | None = Field(default=None, gt=0)
     area_source: AreaSource = "none"
-    # Footprint times storeys (from `building:levels`, else a category guess).
-    # This, not the footprint, is what a per-square-metre intensity applies to.
     floor_area_m2: float | None = Field(default=None, gt=0)
-    # True when LL84 shows district steam as the primary heating fuel; such
-    # sinks are dropped before output, since their heat is already supplied.
+    # District steam is the primary fuel; dropped before output unless the
+    # region keeps them.
     steam_heated: bool = False
 
     @field_validator("id")

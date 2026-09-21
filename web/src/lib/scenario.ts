@@ -5,12 +5,12 @@
 
 import { diffFromDefaults } from "./defaults";
 import type { Engine } from "./engine";
-import { REGIONS, type Econ, type Region, type Weights } from "./types";
+import { REGIONS, type ByRegion, type Econ, type Plain, type Weights } from "./types";
 
-type ByRegion<T> = Record<Region, T>;
-type Plain = Record<string, unknown>;
-
-export const PARAM = "s";
+/** The scenario as `?s=…`, and the region view as `?region=nova`. Separate,
+ *  so a link can pin a region without carrying every slider, and vice versa. */
+const SCENARIO_PARAM = "s";
+const REGION_PARAM = "region";
 
 function toBase64Url(s: string): string {
   const bytes = new TextEncoder().encode(s);
@@ -77,36 +77,23 @@ export function decodeScenario(
   }
 }
 
-/** Region view, as `?region=nova`. Separate from the scenario param so a
- *  link can pin a region without carrying every slider, and vice versa. */
-export const REGION_PARAM = "region";
-
-export function readRegionParam(): string | null {
+function readParam(name: string): string | null {
   try {
-    return new URLSearchParams(window.location.search).get(REGION_PARAM);
+    return new URLSearchParams(window.location.search).get(name);
   } catch {
     return null;
   }
 }
 
-export function writeRegionParam(value: string | null) {
+function writeParam(name: string, value: string | null) {
   const url = new URL(window.location.href);
-  if (value && value !== "all") url.searchParams.set(REGION_PARAM, value);
-  else url.searchParams.delete(REGION_PARAM);
+  if (value) url.searchParams.set(name, value);
+  else url.searchParams.delete(name);
   window.history.replaceState(null, "", url.toString());
 }
 
-export function readScenarioParam(): string | null {
-  try {
-    return new URLSearchParams(window.location.search).get(PARAM);
-  } catch {
-    return null;
-  }
-}
-
-export function writeScenarioParam(value: string | null) {
-  const url = new URL(window.location.href);
-  if (value) url.searchParams.set(PARAM, value);
-  else url.searchParams.delete(PARAM);
-  window.history.replaceState(null, "", url.toString());
-}
+export const readRegionParam = () => readParam(REGION_PARAM);
+export const writeRegionParam = (value: string | null) =>
+  writeParam(REGION_PARAM, value === "all" ? null : value);
+export const readScenarioParam = () => readParam(SCENARIO_PARAM);
+export const writeScenarioParam = (value: string | null) => writeParam(SCENARIO_PARAM, value);

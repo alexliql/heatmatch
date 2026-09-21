@@ -1,6 +1,6 @@
 """The region clip, exercised offline against a committed boundary fixture.
 
-This matters more than it looks: the nyc bbox in §3.1 crosses the Hudson, so
+This matters more than it looks: the nyc bbox crosses the Hudson, so
 without this filter Jersey City facilities enter the dataset as New York ones.
 """
 

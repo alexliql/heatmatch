@@ -407,17 +407,6 @@ button { background: none; border: 0; padding: 0; cursor: pointer; }
 .rank-head > button:hover, .rank-head > button[data-active="true"] { color: var(--fg-0); }
 .rank-head > button:nth-child(2) { text-align: left; }
 
-.chip {
-  display: inline-block;
-  padding: 1px 6px;
-  border-radius: 999px;
-  font-size: 10.5px;
-  font-weight: 500;
-  letter-spacing: 0.02em;
-  background: var(--bg-3);
-  color: var(--fg-1);
-}
-
 /* ------------------------------------------------------------------ Detail */
 
 .detail-head {
@@ -772,12 +761,6 @@ dialog.about::backdrop { background: rgba(0, 0, 0, 0.45); -webkit-backdrop-filte
   z-index: 10;
   background: var(--bg-0);
 }
-.loading { display: flex; flex-direction: column; align-items: center; gap: var(--s-3); }
-.loading .wordmark { font-size: var(--t-2xl); }
-.loading-track { width: 160px; height: 2px; border-radius: 1px; background: var(--bg-3); overflow: hidden; }
-.loading-track > i { display: block; height: 100%; width: 40%; background: var(--heat-fast); animation: slide 1.2s var(--ease) infinite; }
-@keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(350%); } }
-
 .error { max-width: 560px; text-align: left; }
 .error h1 { font-size: var(--t-xl); margin-bottom: var(--s-2); }
 .error code {

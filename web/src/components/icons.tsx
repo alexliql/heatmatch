@@ -59,6 +59,10 @@ export const BackIcon = () => (
   </svg>
 );
 
+/** The icon for a theme setting: what it is, not what a click would do. */
+export const ThemeIcon = ({ theme }: { theme: "light" | "dark" | "system" }) =>
+  theme === "dark" ? <MoonIcon /> : theme === "light" ? <SunIcon /> : <MonitorIcon />;
+
 export const SearchIcon = () => (
   <svg {...base}>
     <circle cx="7" cy="7" r="4.5" />

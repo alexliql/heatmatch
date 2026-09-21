@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { diffFromDefaults, modified, roundTo } from "@/lib/defaults";
 import { km } from "@/lib/format";
 import { sweep, type Param, type Sweep } from "@/lib/sensitivity";
-import { useStore } from "@/lib/store";
+import { useSelectedMatch, useStore } from "@/lib/store";
 import {
   CAT_LABELS,
   REGION_LABELS,
@@ -162,16 +162,14 @@ export function WeightsPanel() {
   const resetRegion = useStore((s) => s.resetRegion);
   const allWeights = useStore((s) => s.weights);
   const allEcon = useStore((s) => s.econ);
-  const selectedDc = useStore((s) => s.selectedDc);
-  const results = useStore((s) => s.results);
+  const selected = useSelectedMatch();
   const [paste, setPaste] = useState<string | null>(null);
   const [pasteError, setPasteError] = useState<string | null>(null);
   const [copied, setCopied] = useState<"link" | "json" | null>(null);
 
   // Sensitivity: only for a selected site in the region being tuned, and a
   // beat behind the sliders so a drag stays smooth.
-  const selectedRegion = results.find((m) => m.dc === selectedDc)?.region;
-  const sensFor = selectedDc && selectedRegion === tuningRegion ? selectedDc : null;
+  const sensFor = selected?.region === tuningRegion ? selected.dc : null;
   const [sensInputs, setSensInputs] = useState<{ w: typeof allWeights; e: typeof allEcon } | null>(null);
   useEffect(() => {
     if (!sensFor) return void setSensInputs(null);
@@ -244,8 +242,8 @@ export function WeightsPanel() {
           ))}
         </div>
         <p className="group-note" style={{ marginTop: 10, marginBottom: 0 }}>
-          Both regions are ranked together but tuned apart: a pipe costs far more in the city and the
-          default reach differs fourfold. One set of numbers across both would make one of them
+          Regions are ranked together but tuned apart: a pipe costs far more in the city and the
+          default reach differs fourfold. One set of numbers across all of them would make some
           meaningless.
         </p>
         <p className="group-note sens-note" style={{ marginBottom: 0 }}>

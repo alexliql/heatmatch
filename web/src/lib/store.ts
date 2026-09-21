@@ -1,18 +1,16 @@
 // Application state.
 //
-// Both regions are ranked together and shown as one list. They keep separate
-// parameters, though, because the differences are physical rather than
-// cosmetic: a pipe costs $3,000/m in the city against $800/m upstate, and the
-// city's default reach is 1 km against 4 km. Forcing one set of numbers across
-// both would make one of them meaningless.
+// Every region is ranked together and shown as one list, but each keeps its
+// own parameters: a pipe costs $3,000/m in Manhattan and $800/m upstate, and
+// one set of numbers across both would make one of them meaningless.
 //
 // Ranking is synchronous: the engine ranks the real dataset in well under a
-// millisecond, so there is no worker here. `lastRankMs` is recorded so that
-// assumption stays visible if the dataset grows.
+// millisecond, so there is no worker. `lastRankMs` keeps that assumption
+// visible if the dataset grows.
 
 import { create } from "zustand";
 
-import { loadEngine, type Engine, type LoadProgress } from "./engine";
+import { loadEngine, type Engine, type LoadStage } from "./engine";
 import {
   decodeScenario,
   encodeScenario,
@@ -23,6 +21,8 @@ import {
 } from "./scenario";
 import {
   REGIONS,
+  byScore,
+  type ByRegion,
   type Contribution,
   type Econ,
   type Match,
@@ -31,10 +31,9 @@ import {
   type Weights,
 } from "./types";
 
-type ByRegion<T> = Record<Region, T>;
-
 export type Theme = "light" | "dark" | "system";
-const THEME_KEY = "heatmatch:theme";
+/** localStorage key; `layout.tsx` reads the same one before first paint. */
+export const THEME_KEY = "heatmatch:theme";
 
 /** Where a selection came from. The map flies to a site picked from the
  *  list, but not to one clicked on the map: it is already under the cursor. */
@@ -48,7 +47,7 @@ export const SHEET_SNAPS: Record<SheetSnap, number> = { peek: 0.14, half: 0.52, 
 
 interface State {
   engine: Engine | null;
-  progress: LoadProgress | null;
+  stage: LoadStage | null;
   error: string | null;
 
   theme: Theme;
@@ -94,7 +93,6 @@ interface State {
   setSearch: (search: string) => void;
   setVisibleOrder: (ids: string[]) => void;
   setSheetSnap: (snap: SheetSnap) => void;
-  syncUrl: () => void;
   recompute: () => void;
 }
 
@@ -104,6 +102,14 @@ function syncUrl(engine: Engine, weights: ByRegion<Weights>, econ: ByRegion<Econ
   clearTimeout(urlTimer);
   urlTimer = setTimeout(() => writeScenarioParam(encodeScenario(engine, weights, econ)), 300);
 }
+
+/** The matches the current view shows: one region's, or every region's. */
+export function inView(results: Match[], view: RegionView): Match[] {
+  return view === "all" ? results : results.filter((m) => m.region === view);
+}
+
+export const useSelectedMatch = () =>
+  useStore((s) => (s.selectedDc ? s.results.find((m) => m.dc === s.selectedDc) : undefined));
 
 const defaults = <T,>(make: (region: Region) => T): ByRegion<T> =>
   Object.fromEntries(REGIONS.map((r) => [r, make(r)])) as ByRegion<T>;
@@ -137,7 +143,7 @@ export function resolvedTheme(theme: Theme): "light" | "dark" {
 
 export const useStore = create<State>((set, get) => ({
   engine: null,
-  progress: null,
+  stage: null,
   error: null,
   theme: "system",
   weights: null,
@@ -160,7 +166,7 @@ export const useStore = create<State>((set, get) => ({
   init: async () => {
     set({ theme: readTheme() });
     try {
-      const engine = await loadEngine((progress) => set({ progress }));
+      const engine = await loadEngine((stage) => set({ stage }));
       // A shared link carries its scenario; otherwise the defaults.
       const param = readScenarioParam();
       const fromUrl = param ? decodeScenario(engine, param) : null;
@@ -206,7 +212,6 @@ export const useStore = create<State>((set, get) => ({
       interacted: true,
     });
     get().recompute();
-    get().syncUrl();
   },
 
   setEcon: (patch) => {
@@ -214,7 +219,6 @@ export const useStore = create<State>((set, get) => ({
     if (!econ) return;
     set({ econ: { ...econ, [tuningRegion]: { ...econ[tuningRegion], ...patch } }, interacted: true });
     get().recompute();
-    get().syncUrl();
   },
 
   resetDefaults: () => {
@@ -225,7 +229,6 @@ export const useStore = create<State>((set, get) => ({
       econ: defaults((r) => engine.defaultEcon(r)),
     });
     get().recompute();
-    get().syncUrl();
   },
 
   resetRegion: (region) => {
@@ -236,7 +239,6 @@ export const useStore = create<State>((set, get) => ({
       econ: { ...econ, [region]: engine.defaultEcon(region) },
     });
     get().recompute();
-    get().syncUrl();
   },
 
   select: (dcId, source = "list") => {
@@ -279,11 +281,7 @@ export const useStore = create<State>((set, get) => ({
     if (get().sheetSnap !== sheetSnap) set({ sheetSnap });
   },
 
-  syncUrl: () => {
-    const { engine, weights, econ } = get();
-    if (engine && weights && econ) syncUrl(engine, weights, econ);
-  },
-
+  /** Re-rank every region and keep the URL in step. */
   recompute: () => {
     const { engine, weights, econ, selectedDc, selectionSource, results: before } = get();
     if (!engine || !weights || !econ) return;
@@ -292,10 +290,9 @@ export const useStore = create<State>((set, get) => ({
       const prevRanks = new Map(before.map((m, i) => [m.dc, i + 1]));
       // Ranked per region, then merged: scores are comparable because the
       // score itself is dimensionless, even though the inputs differ.
-      const results = REGIONS.flatMap((r) => engine.rank(r, weights[r], econ[r])).sort(
-        (a, b) => b.score - a.score || a.dc.localeCompare(b.dc),
-      );
+      const results = REGIONS.flatMap((r) => engine.rank(r, weights[r], econ[r])).sort(byScore);
       set({ results, prevRanks, lastRankMs: performance.now() - t0, error: null });
+      syncUrl(engine, weights, econ);
       // Keep the detail panel in step with the table it was opened from,
       // without flying the map again.
       if (selectedDc) get().select(selectedDc, selectionSource);

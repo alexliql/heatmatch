@@ -1,4 +1,4 @@
-"""Steam and thermal-network zone tagging (§3.3)."""
+"""Steam and thermal-network zone tagging."""
 
 from ingest.sources import zones
 

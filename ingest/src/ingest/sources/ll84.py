@@ -1,22 +1,14 @@
-"""NYC Local Law 84 energy disclosure (HEATMATCH.md §3.3).
-
-Replaces the footprint guess with reported fuel use for buildings large enough
-to be covered. Only heating fuels count: electricity is not what a heat network
-displaces, and district steam means the building already has one.
-"""
+"""NYC Local Law 84 energy disclosure, joined to sinks through PLUTO tax lots."""
 
 import json
 from collections.abc import Sequence
 from functools import lru_cache
 from urllib.parse import quote
 
-from pyproj import Geod
-
 from ingest.config import LL84_JOIN_M, LL84_URL
 from ingest.sources.fetch import cached_get
-from ingest.sources.measured import entry_from_kbtu
-
-_GEOD = Geod(ellps="WGS84")
+from ingest.sources.measured import entry_from_kbtu, nearest
+from ingest.sources.measured import number as _number
 
 _FUEL_FIELDS = (
     "natural_gas_use_kbtu",
@@ -27,15 +19,6 @@ _FUEL_FIELDS = (
 )
 _STEAM_FIELD = "district_steam_use_kbtu"
 _BBL_FIELD = "nyc_borough_block_and_lot"
-
-
-def _number(value) -> float:
-    """LL84 uses 'Not Available' and blanks for missing readings."""
-    try:
-        n = float(str(value).replace(",", ""))
-    except (TypeError, ValueError):
-        return 0.0
-    return n if n > 0 else 0.0
 
 
 def _normalise_bbl(raw: str) -> str:
@@ -74,11 +57,8 @@ def by_bbl(*, refresh: bool = False) -> dict[str, dict]:
 
 
 def attach(rows: list[dict], lots: Sequence[dict], *, refresh: bool = False) -> dict[str, int]:
-    """Replace footprint estimates with LL84 fuel use where a lot matches.
-
-    Mutates `rows` in place and returns counts for the CLI summary. A sink is
-    matched to the nearest tax-lot centroid within LL84_JOIN_M (§3.3).
-    """
+    """Replace estimates with LL84 fuel use where a tax lot matches within
+    LL84_JOIN_M, in place; returns counts for the CLI summary."""
     stats = {"joined": 0, "steam_heated": 0, "candidates": len(rows)}
     fuels = by_bbl(refresh=refresh)
     if not lots or not fuels:
@@ -87,24 +67,19 @@ def attach(rows: list[dict], lots: Sequence[dict], *, refresh: bool = False) -> 
     points = []
     for lot in lots:
         try:
-            points.append((float(lot["latitude"]), float(lot["longitude"]), str(lot["bbl"])))
+            points.append(
+                {
+                    "lat": float(lot["latitude"]),
+                    "lon": float(lot["longitude"]),
+                    "bbl": str(lot["bbl"]),
+                }
+            )
         except (KeyError, TypeError, ValueError):
             continue
 
     for row in rows:
-        best: tuple[float, str] | None = None
-        for lat, lon, bbl in points:
-            # Cheap degree-box reject before the geodesic call; at this latitude
-            # 0.0006° is comfortably more than 40 m in both axes.
-            if abs(lat - row["lat"]) > 0.0006 or abs(lon - row["lon"]) > 0.0008:
-                continue
-            _, _, dist = _GEOD.inv(lon, lat, row["lon"], row["lat"])
-            if dist <= LL84_JOIN_M and (best is None or dist < best[0]):
-                best = (dist, bbl)
-
-        if best is None:
-            continue
-        entry = fuels.get(_normalise_bbl(best[1]))
+        best = nearest(row, points, LL84_JOIN_M)
+        entry = fuels.get(_normalise_bbl(best["bbl"])) if best else None
         if entry is None:
             continue
 

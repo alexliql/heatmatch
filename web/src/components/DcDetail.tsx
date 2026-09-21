@@ -15,7 +15,7 @@ import {
   score,
   usd,
 } from "@/lib/format";
-import { useStore } from "@/lib/store";
+import { inView, useSelectedMatch, useStore } from "@/lib/store";
 import {
   CAT_LABELS,
   CONFIDENCE_LABELS,
@@ -46,6 +46,7 @@ export function DcDetail({ onBack }: { onBack: () => void }) {
   // Above the early returns: hooks must run in the same order every render.
   const { dcs, sinks } = useFeatureIndex(engine);
   const [hoveredCat, setHoveredCat] = useState<SinkCat | null>(null);
+  const match = useSelectedMatch();
 
   // Sinks another highly-ranked site also wants. The model allocates each data
   // center's supply independently, so in a cluster like Ashburn the same pool
@@ -70,15 +71,13 @@ export function DcDetail({ onBack }: { onBack: () => void }) {
     );
   }
 
-  const match = results.find((r) => r.dc === selectedDc);
   const props = dcs.get(selectedDc);
   if (!match) return null;
 
   // Ranked within the region on show, not globally: the reader arrived from a
   // list where this site was #1, and "#8 of 303" contradicts it.
-  const inView =
-    viewRegion === "all" ? results : results.filter((r) => r.region === viewRegion);
-  const rank = inView.findIndex((r) => r.dc === selectedDc) + 1;
+  const shown = inView(results, viewRegion);
+  const rank = shown.indexOf(match) + 1;
   const connected = explain.filter((c) => c.delivered_mwh > 0).length;
 
   const heat = cssVar(BUCKET_VARS[paybackBucket(match.payback_yrs)]);
@@ -89,7 +88,7 @@ export function DcDetail({ onBack }: { onBack: () => void }) {
         <div className="detail-head">
           <div style={{ minWidth: 0 }}>
             <div className="label" style={{ marginBottom: 4 }}>
-              #{rank} of {inView.length}
+              #{rank} of {shown.length}
             </div>
             <h2 className="detail-title">{props?.name ?? selectedDc}</h2>
             <div className="detail-meta">
@@ -150,7 +149,7 @@ export function DcDetail({ onBack }: { onBack: () => void }) {
 
         <DeliveredByCategory hoveredCat={hoveredCat} onHoverCat={setHoveredCat} />
 
-        <SeasonStrip dcId={selectedDc} />
+        <SeasonStrip />
       </section>
 
       <section className="section">

@@ -1,4 +1,4 @@
-//! Local equirectangular projection (HEATMATCH.md §4.3).
+//! Local equirectangular projection.
 //!
 //! Distances here span at most a few kilometres, so a full map projection buys
 //! nothing. Flattening around a per-region origin keeps every downstream

@@ -1,4 +1,4 @@
-"""Cross-source reconciliation of data center candidates (§3.3)."""
+"""Cross-source reconciliation of data center candidates."""
 
 from ingest.merge.dedupe import merge
 
@@ -63,7 +63,7 @@ def test_nearby_sites_with_unrelated_names_are_not_merged() -> None:
 
 
 def test_an_unnamed_neighbour_is_assumed_to_be_the_same_site() -> None:
-    # §3.3: an empty name cannot contradict, so position decides.
+    # An empty name cannot contradict, so position decides.
     rows = merge(
         [
             _row("Equinix NY9", 40.7000, -74.0000, 3.0, "im3_datacenter_atlas"),

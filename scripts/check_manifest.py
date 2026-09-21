@@ -1,4 +1,4 @@
-"""Verify data/manifest.json matches the files it names (spec §7).
+"""Verify data/manifest.json matches the files it names.
 
 Each asset is recorded with a sha256 over its bytes; the filename embeds the
 first 8 hex chars. Both must agree, or the committed data was hand-edited
@@ -21,7 +21,7 @@ ASSETS = ("datacenters", "sinks", "water", "zones", "profiles")
 def main() -> int:
     manifest_path = DATA / "manifest.json"
     if not manifest_path.exists():
-        print("manifest.json not present yet — data pipeline has not been run (T2/T8)")
+        print("manifest.json not present yet — data pipeline has not been run")
         return 0
 
     manifest = json.loads(manifest_path.read_text())

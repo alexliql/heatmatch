@@ -11,7 +11,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { useFeatureIndex, type DcProps } from "@/lib/features";
 import { BUCKET_VARS, cssVar, payback, paybackBucket, pct, score } from "@/lib/format";
-import { useStore } from "@/lib/store";
+import { inView, useStore } from "@/lib/store";
 import {
   CONFIDENCE_LABELS,
   CONFIDENCE_MARKS,
@@ -37,9 +37,6 @@ const SORTS = [
   { id: "utilization", label: "Util." },
 ] as const;
 
-/** One row per site: rank, name, score as a bar, payback, utilization. The
- *  numbers that explain the rank and nothing else; everything further lives
- *  in the detail. */
 /** Which region the map and ranking show. "All" keeps the cross-region view
  *  the app opens with; picking one narrows both, and points the assumption
  *  sliders at it.
@@ -131,30 +128,29 @@ export function Ranking() {
   const [searchOpen, setSearchOpen] = useState(false);
 
   // Match carries the data center's id, not its name.
-  const { dcNames, dcs } = useFeatureIndex(engine);
+  const { dcName, dcs } = useFeatureIndex(engine);
 
   const columns = useMemo(
     () => [
-      col.accessor((m) => dcNames.get(m.dc) ?? m.dc, { id: "name" }),
+      col.accessor((m) => dcName(m.dc), { id: "name" }),
       col.accessor("score", { id: "score" }),
       col.accessor("utilization", { id: "utilization" }),
       // Sorting by payback ascending is "best first"; "never" sorts last.
       col.accessor((m) => m.payback_yrs ?? Number.POSITIVE_INFINITY, { id: "payback" }),
     ],
-    [dcNames],
+    [dcName],
   );
 
   // The region is a choice of *which* list to rank, so it applies before the
   // numbering: in a single-region view the best site there is #1, not #7. The
   // name filter below is a find-within-the-list and deliberately does not
   // renumber.
-  const inView = useMemo(
-    () => (viewRegion === "all" ? results : results.filter((m) => m.region === viewRegion)),
-    [results, viewRegion],
-  );
+  const shown = useMemo(() => inView(results, viewRegion), [results, viewRegion]);
+  // Movement since the last recompute is in true (score) rank.
+  const trueRanks = useMemo(() => new Map(results.map((m, i) => [m.dc, i + 1])), [results]);
 
   const table = useReactTable({
-    data: inView,
+    data: shown,
     columns,
     state: { sorting },
     onSortingChange: setSorting,
@@ -162,7 +158,7 @@ export function Ranking() {
     getSortedRowModel: getSortedRowModel(),
   });
 
-  const maxScore = useMemo(() => Math.max(0, ...inView.map((r) => r.score)) || 1, [inView]);
+  const maxScore = useMemo(() => Math.max(0, ...shown.map((r) => r.score)) || 1, [shown]);
 
   // Keep the selected row in view when the selection came from the map.
   const listRef = useRef<HTMLOListElement>(null);
@@ -178,7 +174,7 @@ export function Ranking() {
   const needle = search.trim().toLowerCase();
   const visible = rows
     .map((row, i) => ({ row, rank: i + 1 }))
-    .filter(({ row }) => !needle || (dcNames.get(row.original.dc) ?? "").toLowerCase().includes(needle));
+    .filter(({ row }) => !needle || dcName(row.original.dc).toLowerCase().includes(needle));
 
   useEffect(() => {
     setVisibleOrder(visible.map((v) => v.row.original.dc));
@@ -195,8 +191,7 @@ export function Ranking() {
     const next = new Map<string, number>();
     for (const el of items) {
       const dc = el.dataset.dc!;
-      // Use offsetTop of the parent <li> instead of getBoundingClientRect().top 
-      // so the coordinate is independent of scroll position.
+      // offsetTop of the <li>, so the coordinate ignores scroll position.
       const top = el.parentElement!.offsetTop;
       next.set(dc, top);
       const was = lastRects.current.get(dc);
@@ -220,7 +215,7 @@ export function Ranking() {
     );
   }
 
-  if (!inView.length) {
+  if (!shown.length) {
     return (
       <>
         <RegionSelect />
@@ -296,10 +291,8 @@ export function Ranking() {
           const bucket = paybackBucket(m.payback_yrs);
           const heat = cssVar(BUCKET_VARS[bucket]);
           const isSelected = m.dc === selectedDc;
-          // Movement since the last recompute, in true (score) rank.
-          const trueRank = results.findIndex((r) => r.dc === m.dc) + 1;
           const was = prevRanks.get(m.dc);
-          const delta = was === undefined ? 0 : was - trueRank;
+          const delta = was === undefined ? 0 : was - trueRanks.get(m.dc)!;
           return (
             <li key={m.dc}>
               <button
@@ -320,7 +313,7 @@ export function Ranking() {
                   )}
                 </span>
                 <span className="rank-name">
-                  <b>{dcNames.get(m.dc) ?? m.dc}</b>
+                  <b>{dcName(m.dc)}</b>
                   <span>
                     {REGION_LABELS[m.region]}
                     <ConfidenceMark dc={dcs.get(m.dc)} />

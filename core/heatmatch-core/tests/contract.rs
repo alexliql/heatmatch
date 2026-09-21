@@ -8,59 +8,15 @@
 //! Note that `lat`/`lon` live in the GeoJSON *geometry*, not in `properties`,
 //! so the test merges them in exactly as the wasm loader will have to.
 
-use std::fs;
-use std::path::PathBuf;
+mod support;
 
 use heatmatch_core::{DataCenter, Econ, Engine, Region, Sink, Weights};
-use serde_json::{Map, Value};
-
-fn data_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../data")
-}
-
-/// Find the single hash-named build of an asset, e.g. `datacenters.ab12cd34.geojson`.
-fn find_asset(prefix: &str) -> PathBuf {
-    let mut hits: Vec<PathBuf> = fs::read_dir(data_dir())
-        .expect("data/ must exist")
-        .filter_map(Result::ok)
-        .map(|e| e.path())
-        .filter(|p| {
-            p.file_name()
-                .and_then(|n| n.to_str())
-                .is_some_and(|n| n.starts_with(prefix) && n.ends_with(".geojson"))
-        })
-        .collect();
-    hits.sort();
-    assert_eq!(
-        hits.len(),
-        1,
-        "expected exactly one {prefix} asset, found {hits:?}"
-    );
-    hits.pop().unwrap()
-}
-
-/// Flatten a GeoJSON point feature into the object core's types expect.
-fn flatten(feature: &Value) -> Map<String, Value> {
-    let mut props = feature["properties"]
-        .as_object()
-        .cloned()
-        .expect("properties");
-    let coords = feature["geometry"]["coordinates"]
-        .as_array()
-        .expect("coordinates");
-    props.insert("lon".into(), coords[0].clone());
-    props.insert("lat".into(), coords[1].clone());
-    props
-}
-
-fn features(path: PathBuf) -> Vec<Value> {
-    let raw: Value = serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
-    raw["features"].as_array().cloned().unwrap()
-}
+use serde_json::Value;
+use support::{data_asset, features, flatten};
 
 #[test]
 fn committed_datacenters_deserialize() {
-    let feats = features(find_asset("datacenters."));
+    let feats = features(&data_asset("datacenters."));
     assert!(!feats.is_empty(), "no data centers committed");
 
     for f in &feats {
@@ -78,7 +34,7 @@ fn committed_datacenters_deserialize() {
 
 #[test]
 fn committed_sinks_deserialize() {
-    let feats = features(find_asset("sinks."));
+    let feats = features(&data_asset("sinks."));
     assert!(!feats.is_empty(), "no sinks committed");
 
     for f in &feats {
@@ -95,7 +51,7 @@ fn committed_sinks_deserialize() {
 #[test]
 fn steam_heated_sinks_ship_only_where_the_region_keeps_them() {
     let mut kept_in_seattle = 0;
-    for f in features(find_asset("sinks.")) {
+    for f in features(&data_asset("sinks.")) {
         if f["properties"]["steam_heated"] != Value::Bool(true) {
             continue;
         }
@@ -123,17 +79,8 @@ fn steam_heated_sinks_ship_only_where_the_region_keeps_them() {
 /// End to end on the real data: the engine must build and rank it.
 #[test]
 fn engine_ranks_the_committed_dataset() {
-    let dcs: Vec<DataCenter> = features(find_asset("datacenters."))
-        .iter()
-        .map(|f| serde_json::from_value(Value::Object(flatten(f))).unwrap())
-        .collect();
-    let sinks: Vec<Sink> = features(find_asset("sinks."))
-        .iter()
-        .map(|f| serde_json::from_value(Value::Object(flatten(f))).unwrap())
-        .collect();
+    let (dcs, sinks) = support::committed();
 
-    // Counted per region: `rank` covers one region at a time, and the dataset
-    // now spans both.
     let expected: Vec<(Region, usize)> = Region::ALL
         .iter()
         .map(|r| (*r, dcs.iter().filter(|d| d.region == *r).count()))

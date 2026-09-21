@@ -1,14 +1,5 @@
-"""Measured heating demand from Seattle's Building Energy Benchmarking.
-
-Seattle requires buildings of 20,000 sq ft and up to report annual energy use
-by fuel, and publishes it (`data.seattle.gov`, dataset `teqw-tu6e`). Unlike
-New York's LL84 the rows carry their own coordinates, so the join is a plain
-nearest-point one with no tax-lot step in between.
-
-District steam is a real fuel here — Enwave Seattle serves downtown — and the
-region keeps steam-heated sinks rather than dropping them, so a steam column
-that would end a building's candidacy in New York only labels it here.
-"""
+"""Seattle's Building Energy Benchmarking (buildings >= 20,000 sq ft). Rows
+carry coordinates, so the join is nearest-point with no tax-lot step."""
 
 import json
 from functools import lru_cache
@@ -27,11 +18,8 @@ SEATTLE_BENCH_SOURCE = {
     "note": "City of Seattle Building Energy Benchmarking, latest reported year; buildings >= 20,000 sq ft.",
 }
 
-# The most recent year with a full reporting cycle behind it. The newest year
-# in the dataset is still filling in when this runs.
+# The most recent year with a full reporting cycle behind it.
 DATA_YEAR = "2024"
-# Benchmarking points are address geocodes; sink points are footprint
-# centroids. Same as LL84's tax-lot join.
 JOIN_M = 40.0
 
 _FIELDS = (
@@ -44,7 +32,7 @@ _FIELDS = (
 
 
 @lru_cache(maxsize=1)
-def _buildings_cached(refresh: bool) -> tuple[dict, ...]:
+def buildings(*, refresh: bool = False) -> tuple[dict, ...]:
     select = ",".join(_FIELDS)
     where = quote(f"datayear='{DATA_YEAR}'")
     url = f"{URL}?$select={quote(select)}&$where={where}&$limit=50000"
@@ -65,10 +53,6 @@ def _buildings_cached(refresh: bool) -> tuple[dict, ...]:
             continue
         out.append({"lat": lat, "lon": lon, **entry})
     return tuple(out)
-
-
-def buildings(*, refresh: bool = False) -> tuple[dict, ...]:
-    return _buildings_cached(refresh)
 
 
 def attach(rows: list[dict], region: RegionName, *, refresh: bool = False) -> dict[str, int]:

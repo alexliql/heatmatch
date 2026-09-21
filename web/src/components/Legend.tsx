@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import { useStore } from "@/lib/store";
+import { useSelectedMatch, useStore } from "@/lib/store";
 import { BUCKET_LABELS, SINK_VARS, cssVar, km } from "@/lib/format";
 import { CAT_LABELS, SINK_CATS, ZONE_LABELS } from "@/lib/types";
 
@@ -16,8 +16,8 @@ const KEY = "heatmatch:legend";
 export function Legend() {
   const [open, setOpen] = useState(true);
   const selectedDc = useStore((s) => s.selectedDc);
-  const results = useStore((s) => s.results);
   const weights = useStore((s) => s.weights);
+  const region = useSelectedMatch()?.region;
   const hasZones = useStore((s) => Boolean(s.engine?.geo.zones));
   const viewRegion = useStore((s) => s.viewRegion);
   // Which territory is on screen. In the "All" view every drawn zone is, so
@@ -26,13 +26,9 @@ export function Legend() {
     viewRegion === "all" ? "District heating territory" : ZONE_LABELS[viewRegion];
   // True once any site carries a stated capacity, which is what makes the
   // solid-versus-outline distinction on the map mean anything.
-  const hasEstimates = useStore((s) => {
-    const fc = s.engine?.geo.datacenters as
-      | { features: { properties: { mw_confidence?: string } }[] }
-      | undefined;
-    const grades = new Set((fc?.features ?? []).map((f) => f.properties.mw_confidence));
-    return grades.size > 1;
-  });
+  const hasEstimates = useStore(
+    (s) => new Set(s.engine?.geo.datacenters.features.map((f) => f.properties.mw_confidence)).size > 1,
+  );
 
   // Open by default where there is room; folded on a phone, where it would
   // cover most of the map above the sheet.
@@ -58,7 +54,6 @@ export function Legend() {
     });
   };
 
-  const region = results.find((m) => m.dc === selectedDc)?.region;
   const reach = region && weights ? weights[region].radius_m : null;
 
   return (

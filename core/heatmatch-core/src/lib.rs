@@ -14,7 +14,6 @@
 pub mod distance;
 pub mod econ;
 pub mod frame;
-pub mod index;
 pub mod scoring;
 pub mod season;
 pub mod thermo;

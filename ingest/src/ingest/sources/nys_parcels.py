@@ -1,4 +1,4 @@
-"""Upstate data center candidates from NYS parcel data (HEATMATCH.md §3.3).
+"""Upstate data center candidates from NYS parcel data.
 
 The NYS GIS Clearinghouse publishes statewide parcels as a multi-gigabyte
 download with no public query API, which is more than this pipeline can justify
@@ -10,14 +10,12 @@ Each entry is a real facility with a published location; `manual/` is the place
 to add more without touching code.
 """
 
-import csv
 from collections.abc import Iterator
-from pathlib import Path
 
-from ingest.config import RegionName, region_for
-from ingest.sources.boundary import in_region_boundary
+from ingest.config import RegionName
+from ingest.sources.boundary import in_region
+from ingest.util import read_manual_csv
 
-MANUAL = Path(__file__).resolve().parents[3] / "manual"
 PARCELS_SOURCE = {
     "id": "manual_upstate",
     "url": "https://github.com/alexliql/heatmatch/blob/main/ingest/manual/upstate_sites.csv",
@@ -32,22 +30,12 @@ def candidates(region: RegionName, *, refresh: bool = False) -> Iterator[dict]:
     if region != "upstate":
         return
 
-    path = MANUAL / "upstate_sites.csv"
-    if not path.exists():
-        return
-
-    for row in csv.DictReader(path.open()):
-        if row.get("name", "").startswith("#") or not row.get("lat"):
-            continue
+    for row in read_manual_csv("upstate_sites.csv"):
         try:
             lat, lon, mw = float(row["lat"]), float(row["lon"]), float(row["mw"])
         except (KeyError, ValueError):
             continue
-        if (
-            mw <= 0
-            or region_for(lat, lon) != "upstate"
-            or not in_region_boundary(lat, lon, "upstate")
-        ):
+        if mw <= 0 or not in_region(lat, lon, "upstate"):
             continue
 
         yield {

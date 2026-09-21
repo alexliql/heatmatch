@@ -1,4 +1,4 @@
-# heatmatch — top-level targets (spec §1)
+# heatmatch — top-level targets
 # Phases are independent; `check` runs everything CI runs.
 
 .PHONY: help ingest core-test wasm web-dev web-build check fmt clean

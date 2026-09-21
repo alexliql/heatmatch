@@ -1,4 +1,4 @@
-//! Monthly demand shapes (HEATMATCH.md §4.5).
+//! Monthly demand shapes.
 //!
 //! A data center's waste heat is flat across the year; most heating demand is
 //! not. Matching them month by month rather than annually is what stops a

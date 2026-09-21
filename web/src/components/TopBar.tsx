@@ -3,39 +3,46 @@
 import { useStore, type Theme } from "@/lib/store";
 import { useLayoutMode } from "@/lib/useMedia";
 
-import { InfoIcon, MonitorIcon, MoonIcon, SunIcon } from "./icons";
+import { InfoIcon, ThemeIcon } from "./icons";
 
-const NEXT: Record<Theme, Theme> = { system: "dark", dark: "light", light: "system" };
+const NEXT_THEME: Record<Theme, Theme> = { system: "dark", dark: "light", light: "system" };
 const THEME_LABEL: Record<Theme, string> = {
   system: "Theme: follows your system",
   dark: "Theme: dark",
   light: "Theme: light",
 };
 
-export function TopBar({ onAbout }: { onAbout: () => void }) {
+/** Cycles system → dark → light. In the top bar on wide screens, in the
+ *  panel foot on phones. */
+export function ThemeButton() {
   const theme = useStore((s) => s.theme);
   const setTheme = useStore((s) => s.setTheme);
+  return (
+    <button
+      className="icon-btn"
+      title={THEME_LABEL[theme]}
+      aria-label={THEME_LABEL[theme]}
+      onClick={() => setTheme(NEXT_THEME[theme])}
+    >
+      <ThemeIcon theme={theme} />
+    </button>
+  );
+}
+
+const STAGE_PROGRESS = { manifest: 0.15, data: 0.55, engine: 0.85, ready: 1 };
+
+export function TopBar({ onAbout }: { onAbout: () => void }) {
   const engine = useStore((s) => s.engine);
   const compact = useLayoutMode() !== "desktop";
-  const stage = useStore((s) => s.progress?.stage);
-  const progress = engine ? 1 : stage === "engine" ? 0.85 : stage === "data" ? 0.55 : stage === "manifest" ? 0.15 : 0.05;
+  const stage = useStore((s) => s.stage);
+  const progress = engine ? 1 : stage ? STAGE_PROGRESS[stage] : 0.05;
 
   return (
     <header className="topbar float" data-compact={compact}>
       <h1 className="wordmark">heatmatch</h1>
       <span className="tagline">Which data centers could usefully heat their neighbours?</span>
       <div className="topbar-actions">
-        {/* On phones the theme toggle lives in the panel foot instead. */}
-        {!compact && (
-          <button
-            className="icon-btn"
-            title={THEME_LABEL[theme]}
-            aria-label={THEME_LABEL[theme]}
-            onClick={() => setTheme(NEXT[theme])}
-          >
-            {theme === "dark" ? <MoonIcon /> : theme === "light" ? <SunIcon /> : <MonitorIcon />}
-          </button>
-        )}
+        {!compact && <ThemeButton />}
         <button className="icon-btn" title="About this tool" aria-label="About" onClick={onAbout}>
           <InfoIcon />
         </button>
